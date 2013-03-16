@@ -1,8 +1,7 @@
 from rhymechecker import RhymeChecker
 from random import random
-
+import sys
 """
-#TODO:
 Architecture:
   1. For each validation type (e.g. syllable count, rhyming, eventually stress), create a "hash" dicts.
     a. Each dict is of the form: hash_value -> [line1, line2, line3]
@@ -85,7 +84,7 @@ class Poemifier:
     if rime:
       return tuple(rime)
     else:
-      False
+      return False
 
   def _syllable_count(self, line):
     """return this line's syllable count to use as key to this value in the syllable_count hash."""
@@ -199,28 +198,6 @@ class Poemifier:
     words_to_compare_to = map(lambda x: x.split(" ")[-1], lines_to_compare_to )
     return True in map(lambda x: self.rhyme_checker.rhymes_with(last_word, x), words_to_compare_to)
 
-  # def validate_syllables(self, line, syllable_count):
-  #   """True if line has the number of syllables specified in syllable_count."""
-  #   syllable_count_on_this_line = 0
-  #   split_line = line.split(" ")
-
-  #   #exclude lines with abbreviations
-  #   if True in map(lambda x: len(x) == 1 and x not in ["a", "A", "I"], split_line):
-  #     return False
-
-  #   for dirty_word in split_line:
-  #     word = dirty_word.strip(",.:?!")
-  #     syllable_count_on_this_line += self.rhyme_checker.count_syllables(word)
-  #   if self.debug: #leads to huge amounts of output
-  #     print line + ": " + str(syllable_count_on_this_line)
-  #   if isinstance(syllable_count, int):
-  #     return syllable_count_on_this_line == syllable_count
-  #   elif isinstance(syllable_count, tuple):
-  #     return syllable_count_on_this_line >= syllable_count[0] and syllable_count_on_this_line <= syllable_count[1]
-
-  # def has_poem(self):
-  #   return True in map(lambda x: None not in x, self.poems)
-
   def _pair_rhyme_lines(self):
     """Pair lines that rhyme."""
     #all the lines in any of the dicts are guaranteed to be of acceptable length.
@@ -254,7 +231,7 @@ class Poemifier:
     #TODO: again, abstraction!
     poem = [None] * self.format["lines_needed"]
     if self.format["rhyme_scheme"]:
-      print "pairs: " +  str(self._pair_rhyme_lines())
+      #print "pairs: " +  str(self._pair_rhyme_lines())
       pairs = self._pair_rhyme_lines()
       for syllable_count_token in self.format["unique_syllable_structure"]:
         if syllable_count_token not in pairs:
@@ -264,7 +241,7 @@ class Poemifier:
           return False
         this_sylls_lines = list(this_sylls_lines[0])
         for index, syllable_count in enumerate(self.format["syllable_structure"]):
-          print(this_sylls_lines)
+          #print(this_sylls_lines)
           if syllable_count == syllable_count_token:
             poem[index] = this_sylls_lines.pop()
       return poem
@@ -284,15 +261,6 @@ class Poemifier:
         poem[index] = next_line
       return poem
 
-  # def old_get_poem(self):
-  #   #print "Created " + str(len(self.poems)) + " partial poems."
-  #   if self.has_poem():
-  #     return "\n".join( filter(lambda x: None not in x, self.poems)[0] )
-  #   else:
-  #     self.poems.sort(key= lambda x: x.count(None)) #[0:10]
-  #     print self.poems[0:10]
-  #     raise ShitsFuckedException, "No poem could be generated!"
-
 def _test():
   import doctest
   doctest.testmod()
@@ -304,7 +272,7 @@ class ShitsFuckedException(Exception):
 #TODO: command line file argument (e.g. find a haiku in this document)
 if __name__ == "__main__":
   import re
-  lists_of_lines = map(lambda x: x.split(","), open("./opinions/11txt/National Federation of Independent Business v. Sebelius/SCALIA.txt").read().split("\n"))
+  lists_of_lines = map(lambda x: x.split(","), open("./SCALIA.txt").read().split("\n"))
 
   lines = [line for line_list in lists_of_lines for line in line_list]
   
@@ -313,7 +281,7 @@ if __name__ == "__main__":
   #  "This is a line that is twenty long", "here are ten more ending in wrong", "Jeremy Bee Merrill plays ping pong",
   #  ]
 
-  p = Poemifier("limerick")
+  p = Poemifier(sys.argv[1])
   p.debug = True
   #TODO: make this a do... while (so we quit when we finish a poem)
   for line in lines:
