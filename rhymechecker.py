@@ -47,15 +47,13 @@ class RhymeChecker:
         print line
       if "(" in word:
         continue #not yet implemented
-      pronunciation = re.sub("[0-9]", "", pronunciation).split(" ") #ignore stress for now. for now. :P
+      #pronunciation = re.sub("[0-9]", "", pronunciation).split(" ") #ignore stress for now. for now. :P
+      pronunciation = pronunciation.split(" ")
       self.pronunciations[word] = RhymeChecker.Pronunciation(pronunciation)
       #self.syllabifications[word] = self.syllabify_pron(pronunciation)
 
   def count_syllables(self, word):
-    """ Return the number of syllables in word. 
-
-      #TODO: if the word is unknown, guess using algo from syllable_count_guesser.py
-    """
+    """ Return the number of syllables in word. """
     if word.upper() in self.syllabifications:
       return len(self.syllabifications[word.upper()].syllables)
     else:
@@ -85,13 +83,13 @@ class RhymeChecker:
       #return syllabification.syllables[-1].rime()
 
       #oxytone
-      if syllabification.syllables[-1].stress == 1:
+      if syllabification.syllables[-1].stress == 1 :
         return syllabification.syllables[-1].rime()
       #paroxytone, proparoxytone, etc. :P
       else:
         my_list = []
         #ugh flatten
-        for inner_list in  map(lambda s: s.rime(), syllabification.syllables[syllabification.primary_stress():]):
+        for inner_list in map(lambda s: s.rime(), syllabification.syllables[syllabification.primary_stress():]):
           for item in inner_list:
             my_list.append(item)
         return my_list
@@ -105,33 +103,33 @@ class RhymeChecker:
     Returns a syllabification object.
 
     >>> r = RhymeChecker()
-    >>> map(lambda syll: syll.phonemes, r.syllabify_pron(RhymeChecker.Pronunciation(["SH", "UW"])).syllables)
-    [['SH', 'UW']]
-    >>> map(lambda syll: syll.phonemes, r.syllabify_pron(RhymeChecker.Pronunciation(["L", "AY1", "N"])).syllables)
+    >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(RhymeChecker.Pronunciation(["SH", "UW1"])).syllables)
+    [['SH', 'UW1']]
+    >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(RhymeChecker.Pronunciation(["L", "AY1", "N"])).syllables)
     [['L', 'AY1', 'N']]
-    >>> map(lambda syll: syll.phonemes, r.syllabify_pron(RhymeChecker.Pronunciation(['W', 'IH1', 'N'])).syllables)
+    >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(RhymeChecker.Pronunciation(['W', 'IH1', 'N'])).syllables)
     [['W', 'IH1', 'N']]
-    >>> map(lambda syll: syll.phonemes, r.syllabify_pron(RhymeChecker.Pronunciation(['T', 'W', 'IH1', 'N'])).syllables)
+    >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(RhymeChecker.Pronunciation(['T', 'W', 'IH1', 'N'])).syllables)
     [['T', 'W', 'IH1', 'N']]
-    >>> map(lambda syll: syll.phonemes, r.syllabify_pron(RhymeChecker.Pronunciation(['M', 'AY1', 'N', 'Z'])).syllables)
+    >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(RhymeChecker.Pronunciation(['M', 'AY1', 'N', 'Z'])).syllables)
     [['M', 'AY1', 'N', 'Z']]
     """
     #one consonant? prefer onset
     #three consonants? prefer one coda, two onsets
     #TODO: write now 
     array_of_arrays_of_phonemes = []
-    stresses = []
+    stresses_per_syllable = []
     for phoneme in pronunciation.phonemes_with_stress:
       #if it's a vowel, start a new syllable and take all but one of the trailing consonants in the prev syll.
       #print phoneme
       stress = None
       if phoneme[-1] in map(lambda i: str(i), range(0,10)):
-        stress = phoneme[-1]
+        stress = int(phoneme[-1])
         phoneme = phoneme[:-1]
-      stresses.append(stress)
       if not array_of_arrays_of_phonemes:
         array_of_arrays_of_phonemes.append([])
       if phoneme in RhymeChecker.vowels:
+
         if array_of_arrays_of_phonemes:
           previous_syllable = array_of_arrays_of_phonemes[-1]
           vowels_in_syllable = map(lambda x: x in RhymeChecker.vowels, previous_syllable)
@@ -144,17 +142,26 @@ class RhymeChecker:
                 onset.append(array_of_arrays_of_phonemes[-1].pop())
             else:
               array_of_arrays_of_phonemes.append([])
+              stresses_per_syllable.append(stress)
             #print "moved " + str(consonants_to_pop) + " consonants to the onset of the next syllable"
           else:
+            stresses_per_syllable.append(stress)
             array_of_arrays_of_phonemes[-1].append(phoneme)
             continue
         if onset and len(onset) > 0:
           onset.reverse()
           array_of_arrays_of_phonemes.append([] + onset)
+          stresses_per_syllable.append(stress)
         array_of_arrays_of_phonemes[-1].append(phoneme)
       else: #phoneme is not a vowel
         array_of_arrays_of_phonemes[-1].append(phoneme)
-    return RhymeChecker.Syllabification(map(lambda array_of_phonemes_stress: RhymeChecker.Syllable(array_of_phonemes_stress[0], array_of_phonemes_stress[1]), zip(array_of_arrays_of_phonemes, stresses)))
+    # print array_of_arrays_of_phonemes
+    # print stresses_per_syllable
+    #TODO: fix this. stresses is insufficiently nested, e.g.
+    #     [None, '1', None, None]
+    # [['M', 'AY', 'N', 'Z']]
+
+    return RhymeChecker.Syllabification(map(lambda aops: RhymeChecker.Syllable(aops[0], aops[1]), zip(array_of_arrays_of_phonemes, stresses_per_syllable)))
 
   def rhymes_with(self, word1, word2):
     """ Returns whether word1 rhymes with word2.
@@ -167,8 +174,18 @@ class RhymeChecker:
     False
     >>> r.rhymes_with("candy", "sand")
     False
+    >>> r.rhymes_with("passion", "ration")
+    True
+    >>> r.rhymes_with("human", "cumin")
+    True
+    >>> r.rhymes_with("rhyme", "sublime")
+    True
+    >>> r.rhymes_with("picky", "tricky")
+    True
+    >>> r.rhymes_with("", "")
+    True
     """
-
+    #sys.stderr.write( str(self.get_rime(word1)) + " " + str(self.get_rime(word2)) + "\n")
     return self.get_rime(word1) == self.get_rime(word2)
     # if word1.upper() in self.syllabifications:
     #   syllables1 = self.syllabifications[word1.upper()]
@@ -215,6 +232,13 @@ class RhymeChecker:
     #for paroxytones (ha! words with penultimate stress, let's include the onset
     # of the last syllable and rime of the penultimate)
 
+    def phonemes_with_stress(self):
+      if self.stress:
+        stress_str = str(self.stress)
+      else:
+        stress_str = ""
+      return self.onset() + map(lambda s: s + stress_str, self.nucleus()) + self.coda()
+
     def nucleus(self):
       return filter(lambda x: x in RhymeChecker.vowels, self.phonemes)
     def _nucleus_start(self):
@@ -239,7 +263,7 @@ class RhymeChecker:
   def test_stuff(self, word):
     pron = self.pronunciations[word.upper()]
     print map(lambda s: s, pron.phonemes)
-    print map(lambda s: s.phonemes, self.syllabify_pron(pron))
+    print map(lambda s: s.phonemes_with_stress(), self.syllabify_pron(pron).syllables)
 
 def _test():
   import doctest
@@ -247,5 +271,5 @@ def _test():
 
 if __name__ == "__main__":
   # r = RhymeChecker()
-  # r.test_stuff("anthropology")
+  # r.test_stuff("sublime")
   _test()
