@@ -9,6 +9,8 @@ Architecture:
   2. Discard or ignore all syllable_hash_dict entries whose syllable counts are not in the format.
   3: Optionally, pair stuff, e.g. rhyming pairs or triplets (or n-lets where n is the greatest amount of rhyming lines needed in the format, e.g. 3 for a limerick, , but only 2 for a sonnet.) and, if necessary, of the right syllable length.
   4. From these pairs, assemble a poem.
+
+  e.g. python poemifier.py sonnet ./SCALIA.txt 
 """
 
 #TODO: use espeak, add pitch to "sing" the poems
@@ -122,6 +124,7 @@ class Poemifier:
       rime = self._rime(line)
       if not rime:
         return False
+      rime = tuple(rime)
       for syll_count_token in self.format["syllable_count_to_syllable_count_token"][syll_count]:
         if syll_count_token not in self.syllable_count_dict:
           self.syllable_count_dict[syll_count_token] = []
@@ -235,10 +238,10 @@ class Poemifier:
       pairs = self._pair_rhyme_lines()
       for syllable_count_token in self.format["unique_syllable_structure"]:
         if syllable_count_token not in pairs:
-          return False
+          return None
         this_sylls_lines = filter(lambda rhymes: len(rhymes) >= self.format["syllable_structure"].count(syllable_count_token), pairs[syllable_count_token].values())
         if not this_sylls_lines:
-          return False
+          return None
         this_sylls_lines = list(this_sylls_lines[0])
         for index, syllable_count in enumerate(self.format["syllable_structure"]):
           #print(this_sylls_lines)
@@ -249,10 +252,10 @@ class Poemifier:
       #TODO: delete all the hash entries that don't fit anything in the syllable structure
       for index, syllable_count in enumerate(self.format["syllable_structure"]):
         if syllable_count not in self.syllable_count_dict:
-          return False 
+          return None 
         candidate_lines = filter(lambda l: l not in poem, self.syllable_count_dict[syllable_count])
         if not candidate_lines:
-          return False
+          return None
         if random:
           next_line_index = random(len(candidate_lines))
         else:
@@ -269,10 +272,12 @@ class ShitsFuckedException(Exception):
   pass
 
 
-#TODO: command line file argument (e.g. find a haiku in this document)
 if __name__ == "__main__":
   import re
-  lists_of_lines = map(lambda x: x.split(","), open("./SCALIA.txt").read().split("\n"))
+  poem_format = sys.argv[1]
+  input_text = sys.argv[2] or "./SCALIA.txt"
+
+  lists_of_lines = map(lambda x: x.split(","), open(sys.argv[2]).read().split("\n"))
 
   lines = [line for line_list in lists_of_lines for line in line_list]
   
@@ -281,7 +286,7 @@ if __name__ == "__main__":
   #  "This is a line that is twenty long", "here are ten more ending in wrong", "Jeremy Bee Merrill plays ping pong",
   #  ]
 
-  p = Poemifier(sys.argv[1])
+  p = Poemifier(poem_format)
   p.debug = True
   #TODO: make this a do... while (so we quit when we finish a poem)
   for line in lines:
