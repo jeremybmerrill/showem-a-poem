@@ -74,7 +74,7 @@ class RhymeChecker:
 
     #TODO: for words with penultimate or antepenultimate stress, return 
       penultimate syllable's rime and ultimate syllable.
-      (e.g. syllable rhymes with killable, but not edible.)
+      (e.g. syllable rhymes with killable, but not edible (except with pin/pen merger)).
     """
     try:
       syllabification = self.syllabify(word)
@@ -84,15 +84,16 @@ class RhymeChecker:
 
       #oxytone
       if syllabification.syllables[-1].stress == 1 :
-        return syllabification.syllables[-1].rime()
+        return map(lambda s: tuple(s),[syllabification.syllables[-1].rime()])
       #paroxytone, proparoxytone, etc. :P
       else:
-        my_list = []
+        rimes = []
         #ugh flatten
         for inner_list in map(lambda s: s.rime(), syllabification.syllables[syllabification.primary_stress():]):
+          rimes.append([])
           for item in inner_list:
-            my_list.append(item)
-        return my_list
+            rimes[-1].append(item)
+        return map(lambda s: tuple(s), rimes)
     except KeyError:
       return []
 
@@ -180,13 +181,16 @@ class RhymeChecker:
     True
     >>> r.rhymes_with("rhyme", "sublime")
     True
+    >>> r.rhymes_with("rhyme", "downtime")
+    True
     >>> r.rhymes_with("picky", "tricky")
     True
     >>> r.rhymes_with("", "")
     True
     """
-    #sys.stderr.write( str(self.get_rime(word1)) + " " + str(self.get_rime(word2)) + "\n")
-    return self.get_rime(word1) == self.get_rime(word2)
+    min_length = min(len(self.get_rime(word1)), len(self.get_rime(word2)))
+    #sys.stderr.write( str(min_length) + " " + str(self.get_rime(word1)[-min_length:]) + " " + str(self.get_rime(word2)[-min_length:]) + "\n")
+    return self.get_rime(word1)[-min_length:] == self.get_rime(word2)[-min_length:]
     # if word1.upper() in self.syllabifications:
     #   syllables1 = self.syllabifications[word1.upper()]
     #   syllables2 = self.syllabifications[word2.upper()]
