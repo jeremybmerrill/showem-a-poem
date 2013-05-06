@@ -1,5 +1,5 @@
 from rhymechecker import RhymeChecker
-from random import random
+from random import randint
 import sys
 """
 Architecture:
@@ -239,17 +239,17 @@ class Poemifier:
       for syllable_count_token in self.format["unique_syllable_structure"]:
         if syllable_count_token not in pairs:
           return None
-        this_sylls_lines = filter(lambda rhymes: len(rhymes) >= self.format["syllable_structure"].count(syllable_count_token), pairs[syllable_count_token].values())
-        if not this_sylls_lines:
+        candidate_lines = filter(lambda rhymes: len(rhymes) >= self.format["syllable_structure"].count(syllable_count_token), pairs[syllable_count_token].values())
+        if not candidate_lines:
           return None
-        this_sylls_lines = list(this_sylls_lines[0])
+        this_sylls_lines = list(candidate_lines[randint(0,len(candidate_lines) - 1) if random else 0 ])
         for index, syllable_count in enumerate(self.format["syllable_structure"]):
-          #print(this_sylls_lines)
           if syllable_count == syllable_count_token:
             poem[index] = this_sylls_lines.pop()
       return poem
     elif self.format["syllable_structure"]:
       #TODO: delete all the hash entries that don't fit anything in the syllable structure
+      raise ShitsFuckedException # I think this is dead code.
       for index, syllable_count in enumerate(self.format["syllable_structure"]):
         if syllable_count not in self.syllable_count_dict:
           return None 
@@ -257,10 +257,10 @@ class Poemifier:
         if not candidate_lines:
           return None
         if random:
-          next_line_index = random(len(candidate_lines))
+          next_line_index = randint(0,len(candidate_lines) - 1)
         else:
           next_line_index = 0
-        next_line = candidate_lines[next_line_index] #TODO: if random, pick one randomly.
+        next_line = candidate_lines[next_line_index]
         poem[index] = next_line
       return poem
 
@@ -305,7 +305,7 @@ if __name__ == "__main__":
     # print p.rhyme_dict
     # print ""
   print ""
-  print p.get_poem()
+  print p.get_poem(True)
 
 
 #TODO: make split lines work.
