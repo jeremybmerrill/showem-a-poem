@@ -72,7 +72,7 @@ class RhymeChecker:
     """
     Return this word's rime. 
 
-    #TODO: for words with penultimate or antepenultimate stress, return 
+    #for words with penultimate or antepenultimate stress, return 
       penultimate syllable's rime and ultimate syllable.
       (e.g. syllable rhymes with killable, but not edible (except with pin/pen merger)).
     """
@@ -117,7 +117,6 @@ class RhymeChecker:
     """
     #one consonant? prefer onset
     #three consonants? prefer one coda, two onsets
-    #TODO: write now 
     array_of_arrays_of_phonemes = []
     stresses_per_syllable = []
     for phoneme in pronunciation.phonemes_with_stress:
@@ -158,9 +157,6 @@ class RhymeChecker:
         array_of_arrays_of_phonemes[-1].append(phoneme)
     # print array_of_arrays_of_phonemes
     # print stresses_per_syllable
-    #TODO: fix this. stresses is insufficiently nested, e.g.
-    #     [None, '1', None, None]
-    # [['M', 'AY', 'N', 'Z']]
 
     return RhymeChecker.Syllabification(map(lambda aops: RhymeChecker.Syllable(aops[0], aops[1]), zip(array_of_arrays_of_phonemes, stresses_per_syllable)))
 
