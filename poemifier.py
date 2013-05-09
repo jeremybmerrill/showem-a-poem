@@ -14,7 +14,7 @@ Architecture:
 """
 
 #TODO: use espeak, add pitch to "sing" the poems
-#TODO: fix up rhymechecker to check based on penultimate rime in words with penultimate stress.
+
 class Poemifier:
   def __init__(self, format_name, format=None):
     """Specify the name of a known format or specify a fully-defined format."""
@@ -43,7 +43,7 @@ class Poemifier:
     self.rhyme_checker = RhymeChecker()
     self.rhyme_checker.debug = False
 
-    #TODO abstract away hash types.
+    #TODO abstract away hash types by format.
     self.rhyme_dict = {}
     self.syllable_count_dict = {}
 
@@ -81,7 +81,6 @@ class Poemifier:
 
   def _rime(self, line):
     """Return this line's last word's rime to use as key to this value in the rhyme hash."""
-    #TODO integrate with rhymechecker's stress stuff to sometimes return penultimate syllable's rime + last syllable.
     rime = self.rhyme_checker.get_rime(line.split(" ")[-1])
     if rime:
       return tuple(rime)
@@ -94,7 +93,6 @@ class Poemifier:
 
   def try_line(self, line):
     """ Add a line, then return True if, given that line, a poem can be created."""
-    #TODO: add line to all hashes.
     self.add_line(line)
     #TODO: split line here.
     return self.get_poem() #False or a poem.
@@ -140,15 +138,15 @@ class Poemifier:
       return False
 
   def split_line_at_syllable_count(self, line, syllable_count):
-    """Returns a line split at the given number of syllables. False if split is inside a word.
+    """Returns a line split at the given number(s) of syllables. 
 
-    #TODO: Should this return a list of possible splits? Yes.
+    If a range, return a list of possibilities.
     E.g. for sentence "a man a plan" and range 1,3, 
     Should this return [["a", "man a plan"], ["a man", "a plan"], ["a man a", "plan"]]?
 
     >>> p = Poemifier("haiku")
     >>> p.split_line_at_syllable_count("There once was banana man from the beach", 4)
-    False
+    []
     >>> p.split_line_at_syllable_count("There once was a man from the beach", 4)
     [['There once was a', 'man from the beach']]
     >>> p.split_line_at_syllable_count("There once was a man from the beach banana", 4)
@@ -280,7 +278,7 @@ if __name__ == "__main__":
   lists_of_lines = map(lambda x: x.split(","), open(sys.argv[2]).read().split("\n"))
 
   lines = [line for line_list in lists_of_lines for line in line_list]
-  
+
   #lines = ["camping is in tents", "my tree table tries", "between those times I slept none"]
   # lines = ["many words in english rhyme with song", "one two three four five six", "a bee see dee word kicks",
   #  "This is a line that is twenty long", "here are ten more ending in wrong", "Jeremy Bee Merrill plays ping pong",
@@ -288,7 +286,7 @@ if __name__ == "__main__":
 
   p = Poemifier(poem_format)
   p.debug = True
-  #TODO: make this a do... while (so we quit when we finish a poem)
+  #this can't be a do... while, because we have to add all the lines, then do various processing steps.
   for line in lines:
     line = re.sub("[^A-Za-z ']", "", line)
     line = line.strip()
@@ -312,12 +310,3 @@ if __name__ == "__main__":
 
 #TODO: (eventually)
 # Allow multiple poems to be requested (only break when the number of complete poems in self.poems = the number requested)
-
-"""
-  #TODO! fix this: 
-  lines = ["many words in english rhyme with song", "one two three four five six", "a bee see dee word kicks",
-  "This is a line that is twenty long and here are ten more ending in bong", "Jeremy Bee Merrill plays ping pong",
-  ]
-  the ordering is wrong. if the first line is moved to the end, it works.
-  Find a recursive-y way to get the right result here.
-"""
