@@ -1,13 +1,10 @@
-import urllib2, urllib
-import pickle
-import json
-import sys
+#import sys
 import re
 import os.path
 from syllable_count_guesser import SyllableCountGuesser
 
 #OMG: this has stress?!?!?! so much fun.
-#TODO: should I make phoneme class with is_vowel(); etc.
+#QUESTION: should I make phoneme class with is_vowel(); etc.?
 
 """
   How to do stress:
@@ -15,9 +12,6 @@ from syllable_count_guesser import SyllableCountGuesser
   Syllable: has stress attribute, either 0, 1 or 2
   Syllabification: method to look at syllables, return primary, secondary stresses.
   Pronunciation: 
-
-
-  #TODO: profile. does this need speeding up? "caching" by stashing stuff in a dict?
 """
 
 
@@ -179,6 +173,10 @@ class RhymeChecker:
     True
     >>> r.rhymes_with("rhyme", "downtime")
     True
+    >>> r.rhymes_with("sublime", "downtime") #sketchy, but close enough
+    True
+    >>> r.rhymes_with("armchair", "despair") #sketchy, but close enough
+    True
     >>> r.rhymes_with("picky", "tricky")
     True
     >>> r.rhymes_with("", "")
@@ -187,20 +185,6 @@ class RhymeChecker:
     min_length = min(len(self.get_rime(word1)), len(self.get_rime(word2)))
     #sys.stderr.write( str(min_length) + " " + str(self.get_rime(word1)[-min_length:]) + " " + str(self.get_rime(word2)[-min_length:]) + "\n")
     return self.get_rime(word1)[-min_length:] == self.get_rime(word2)[-min_length:]
-    # if word1.upper() in self.syllabifications:
-    #   syllables1 = self.syllabifications[word1.upper()]
-    #   syllables2 = self.syllabifications[word2.upper()]
-    # else:
-    #   syllables1 = self.syllabify_pron(self.pronunciations[word1.upper()]).syllables
-    #   syllables2 = self.syllabify_pron(self.pronunciations[word2.upper()]).syllables
-    # word1_last_syllable = syllables1[-1]
-    # word2_last_syllable = syllables2[-1]
-    # return word1_last_syllable.rime() == word2_last_syllable.rime()
-    # word1_nucleus = word1_last_syllable.nucleus()
-    # word2_nucleus = word2_last_syllable.nucleus()
-    # word1_coda = word1_last_syllable.coda()
-    # word2_coda = word2_last_syllable.coda()
-    # return word1_nucleus == word2_nucleus and word1_coda == word2_coda
 
   class Pronunciation:
     def __init__(self, phonemes_array):

@@ -288,11 +288,11 @@ if __name__ == "__main__":
   p.debug = True
   #this can't be a do... while, because we have to add all the lines, then do various processing steps.
   for line in lines:
+    if "No. " in line:
+      continue
     line = re.sub("[^A-Za-z ']", "", line)
     line = line.strip()
-    if re.search("\s[BCDEFGHJKLMNOPQRSTUVWXYZ]\s", line): # or re.search("\s[BCDEFGHJKLMNOPQRSTUVWXYZ]$", line) :
-      continue
-    if "No" in line:
+    if re.search("\s[BCDEFGHJKLMNOPQRSTUVWXYZ]\s", line): #if it contains any abbreviations
       continue
     p.try_line(line)
     # if p.try_line(line):
