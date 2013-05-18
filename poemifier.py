@@ -1,9 +1,11 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from rhymechecker import RhymeChecker
+from rhymetime import RhymeChecker
 from random import randint, shuffle
+import re
 import sys
+import poem
 """
 Architecture:
   1. For each validation type (e.g. syllable count, rhyming, eventually stress), create a "hash" dicts.
@@ -24,8 +26,74 @@ class Line:
   text = None
   siblings = None
   rime = None
-  def __init__(self, text):
+  _cleaned_text = None
+  def __init__(self, text, rhyme_checker):
     self.text = text
+    self.rhyme_checker = rhyme_checker
+  def is_partial(self):
+    return not not siblings
+  def should_be_skipped(self):
+    return "No." in self.text or \
+      re.search("\s[BCDEFGHJKLMNOPQRSTUVWXYZ]\s", self.text) #if it contains any abbreviations
+
+  def clean_text(self):
+    if self._cleaned_text:
+      return self._cleaned_text
+    clean_text = re.sub("[^A-Za-z \-']", "", self.text)
+    clean_text = re.sub("  +", " ", clean_text)
+    clean_text = clean_text.strip()
+    self._cleaned_text = clean_text
+    return clean_text
+
+  def split_line_at_syllable_count(self, syllable_count):
+    """Returns a line split at the given number(s) of syllables. 
+
+    If a range, return a list of possibilities.
+    E.g. for sentence "a man a plan" and range 1,3, 
+    Should this return [["a", "man a plan"], ["a man", "a plan"], ["a man a", "plan"]]?
+
+    >>> r = RhymeChecker()
+    >>> l = Line("There once was banana man from the beach", r)
+    >>> l.split_line_at_syllable_count(4)
+    []
+    >>> l = Line("There once was a man from the beach", r)
+    >>> l.split_line_at_syllable_count(4)
+    [['There once was a', 'man from the beach']]
+    >>> l = Line("There once was a man from the beach banana", r)
+    >>> l.split_line_at_syllable_count(4)
+    [['There once was a', 'man from the beach banana']]
+    >>> l = Line("There once was banana people from the beach", r)
+    >>> l.split_line_at_syllable_count((5,7))
+    [['There once was banana', 'people from the beach']]
+    >>> l = Line("There once was banana man from the beach Anna", r)
+    >>> l.split_line_at_syllable_count((5,7))
+    [['There once was banana', 'man from the beach Anna'], ['There once was banana man', 'from the beach Anna']]
+    """
+
+    if isinstance(syllable_count, int):
+      splits = [self._split_line_at_syllable_count_helper(self.clean_text(), syllable_count)]
+    elif isinstance(syllable_count, tuple):
+      splits = map(lambda s: self._split_line_at_syllable_count_helper(self.clean_text(), s), range(syllable_count[0], syllable_count[1]+1))
+    return filter(lambda x: x is not False, splits) or []
+
+  def _split_line_at_syllable_count_helper(self, line, syllable_count):
+    split_line = line.split(" ")
+    if "" in split_line:
+      return False
+    if syllable_count == 0:
+      return ["", line]
+    elif syllable_count > 0:
+      word = split_line[0]
+      this_word_syllables = self.rhyme_checker.count_syllables(word)
+      next_return =  self._split_line_at_syllable_count_helper(" ".join(split_line[1:]), syllable_count - this_word_syllables)
+      if next_return:
+        next_return[0] = " ".join([word] + filter(lambda x: x != "", next_return[0].split(" ")))
+        return next_return
+      else:
+        return False
+    else:
+      return False
+
 
 class Poemifier:
   def __init__(self, format_name, format=None):
@@ -51,7 +119,6 @@ class Poemifier:
     self.format = self._fill_out_format(self.formats[format_name])
     self.lines_needed = self.format["lines_needed"]
 
-    self.partial_lines = {}
     #self.poems = [ [None] * self.lines_needed ] 
 
     self.rhyme_checker = RhymeChecker()
@@ -132,7 +199,7 @@ class Poemifier:
       #TODO: figure out a way to pair these lines, so we don't get stuff split in the middle.
       for part_of_line in split:
         self._add_line_helper(part_of_line)
-        self.partial_lines[part_of_line] = filter(lambda x: x != part_of_line, split)
+        #self.partial_lines[part_of_line] = filter(lambda x: x != part_of_line, split)
     return self._add_line_helper(line)
 
   def _add_line_helper(self, line):
@@ -308,38 +375,40 @@ class ShitsFuckedException(Exception):
 
 
 if __name__ == "__main__":
-  import re
-  poem_format = sys.argv[1]
+  poem = getattr(poem, sys.argv[1].capitalize())() #class
+  poem_format = sys.argv[1] #TODO remove (I'm keeping this around for backwards compatibility until I totally integrate poem classes)
   input_text = sys.argv[2] or "./SCALIA.txt"
 
-  lists_of_lines = map(lambda x: x.split(","), open(sys.argv[2]).read().split("\n"))
+  lists_of_linetexts = map(lambda x: x.split(","), open(sys.argv[2]).read().split("\n"))
 
-  lines = [line for line_list in lists_of_lines for line in line_list]
+  linetexts = [line for line_list in lists_of_linetexts for line in line_list]
 
-  #lines = ["camping is in tents", "my tree table tries", "between those times I slept none"]
-  # lines = ["many words in english rhyme with song", "one two three four five six", "a bee see dee word kicks",
+  #linetexts = ["camping is in tents", "my tree table tries", "between those times I slept none"]
+  # linetexts = ["many words in english rhyme with song", "one two three four five six", "a bee see dee word kicks",
   #  "This is a line that is twenty long", "here are ten more ending in wrong", "Jeremy Bee Merrill plays ping pong",
   #  ]
 
   p = Poemifier(poem_format)
   p.debug = True
   #this can't be a do... while, because we have to add all the lines, then do various processing steps.
-  for line in lines:
-    if "No." in line:
+  for linetext in linetexts:
+
+    #for line class.
+    # line = Line(linetext, p.rhyme_checker)
+    # if line.should_be_skipped():
+    #   continue
+    # p.try_line(line)
+
+
+
+    if "No." in linetext:
       continue
-    line = re.sub("[^A-Za-z \-']", "", line)
-    line = re.sub("  +", " ", line)
-    line = line.strip()
-    if re.search("\s[BCDEFGHJKLMNOPQRSTUVWXYZ]\s", line): #if it contains any abbreviations
+    linetext = re.sub("[^A-Za-z \-']", "", linetext)
+    linetext = re.sub("  +", " ", linetext)
+    linetext = linetext.strip()
+    if re.search("\s[BCDEFGHJKLMNOPQRSTUVWXYZ]\s", linetext): #if it contains any abbreviations
       continue
-    p.try_line(line)
-    # if p.try_line(line):
-    #   if p.debug: 
-    #     print "Done!"
-    #   break
-    # print p.syllable_count_dict
-    # print p.rhyme_dict
-    # print ""
+    p.try_line(linetext)
   print ""
   print p.get_poem(True)
 
