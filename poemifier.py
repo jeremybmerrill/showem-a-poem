@@ -239,8 +239,6 @@ class Poemifier:
   def get_poem(self, random=False):
     """ Return False or a poem. """
     #TODO: again, abstraction!
-
-    #TODO: skip 
     poem = [None] * self.format["lines_needed"]
     if self.format["rhyme_scheme"]:
       #print "pairs: " +  str(self._pair_rhyme_lines())
@@ -256,8 +254,8 @@ class Poemifier:
           if not candidate_lines:
             return None
 
-            #TODO:
-          #for each set of lines in candidate lines, check if it has any partials
+          #TODO:
+          #for each set of lines in candidate lines, check if it has any partial lines
           #and if so, whether, the following/preceding line(s) fit in the next slot.
           #throw it out if not.
           if random:
@@ -335,7 +333,7 @@ if __name__ == "__main__":
   print ""
   print p.get_poem(True)
 
-#TODO: make split lines work.
+#TODO: for split lines, don't add part of the line unless we can add the rest. Should I have a line object?
 #TODO: write tests
 #TODO: (eventually)
 # Allow multiple poems to be requested (only break when the number of complete poems in self.poems = the number requested)
