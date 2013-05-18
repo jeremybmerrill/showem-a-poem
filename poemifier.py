@@ -6,6 +6,7 @@ from random import randint, shuffle
 import re
 import sys
 import poem
+from line import Line
 """
 Architecture:
   1. For each validation type (e.g. syllable count, rhyming, eventually stress), create a "hash" dicts.
@@ -21,105 +22,15 @@ Architecture:
 #TODO integrate with poem classes.
 #TODO write line class
 
-class Line:
-  #lines have text, a rime, and sometimes siblings (if the line comes from a split line-of-text)
-  text = None
-  siblings = None
-  rime = None
-  _cleaned_text = None
-  def __init__(self, text, rhyme_checker):
-    self.text = text
-    self.rhyme_checker = rhyme_checker
-  def is_partial(self):
-    return not not siblings
-  def should_be_skipped(self):
-    return "No." in self.text or \
-      re.search("\s[BCDEFGHJKLMNOPQRSTUVWXYZ]\s", self.text) #if it contains any abbreviations
-
-  def clean_text(self):
-    if self._cleaned_text:
-      return self._cleaned_text
-    clean_text = re.sub("[^A-Za-z \-']", "", self.text)
-    clean_text = re.sub("  +", " ", clean_text)
-    clean_text = clean_text.strip()
-    self._cleaned_text = clean_text
-    return clean_text
-
-  def split_line_at_syllable_count(self, syllable_count):
-    """Returns a line split at the given number(s) of syllables. 
-
-    If a range, return a list of possibilities.
-    E.g. for sentence "a man a plan" and range 1,3, 
-    Should this return [["a", "man a plan"], ["a man", "a plan"], ["a man a", "plan"]]?
-
-    >>> r = RhymeChecker()
-    >>> l = Line("There once was banana man from the beach", r)
-    >>> l.split_line_at_syllable_count(4)
-    []
-    >>> l = Line("There once was a man from the beach", r)
-    >>> l.split_line_at_syllable_count(4)
-    [['There once was a', 'man from the beach']]
-    >>> l = Line("There once was a man from the beach banana", r)
-    >>> l.split_line_at_syllable_count(4)
-    [['There once was a', 'man from the beach banana']]
-    >>> l = Line("There once was banana people from the beach", r)
-    >>> l.split_line_at_syllable_count((5,7))
-    [['There once was banana', 'people from the beach']]
-    >>> l = Line("There once was banana man from the beach Anna", r)
-    >>> l.split_line_at_syllable_count((5,7))
-    [['There once was banana', 'man from the beach Anna'], ['There once was banana man', 'from the beach Anna']]
-    """
-
-    if isinstance(syllable_count, int):
-      splits = [self._split_line_at_syllable_count_helper(self.clean_text(), syllable_count)]
-    elif isinstance(syllable_count, tuple):
-      splits = map(lambda s: self._split_line_at_syllable_count_helper(self.clean_text(), s), range(syllable_count[0], syllable_count[1]+1))
-    return filter(lambda x: x is not False, splits) or []
-
-  def _split_line_at_syllable_count_helper(self, line, syllable_count):
-    split_line = line.split(" ")
-    if "" in split_line:
-      return False
-    if syllable_count == 0:
-      return ["", line]
-    elif syllable_count > 0:
-      word = split_line[0]
-      this_word_syllables = self.rhyme_checker.count_syllables(word)
-      next_return =  self._split_line_at_syllable_count_helper(" ".join(split_line[1:]), syllable_count - this_word_syllables)
-      if next_return:
-        next_return[0] = " ".join([word] + filter(lambda x: x != "", next_return[0].split(" ")))
-        return next_return
-      else:
-        return False
-    else:
-      return False
-
-
 class Poemifier:
-  def __init__(self, format_name, format=None):
+  def __init__(self, poem):
     """Specify the name of a known format or specify a fully-defined format."""
-    #TODO specify a name (req) and optionally the format specification
-    self.formats = {
-        "haiku" : {"syllable_structure" : [5,7,5],
-                   "rhyme_scheme" : "abc"},
-        "limerick" : {"syllable_structure" : [(9,11),(9, 11),6,6,(9, 11)], 
-                       "rhyme_scheme" : "aabba"},
-        "sonnet" : {"syllable_structure" : [10],
-                      "rhyme_scheme" :  "ababcdcdefefgg"},
-        "freeverse" : {"lines_needed" : 10}
-      }
     self.debug = False
     #self.poem_complete = False #dunno what this is.
     #self.poem_validator = PoemValidator()
-    if not format:
-      self.format_name = format_name
-    else:
-      self.format_name = format_name
-      self.formats[format_name] = format #potentially temporarily overwriting a predefined format. That's okay.
-    self.format = self._fill_out_format(self.formats[format_name])
-    self.lines_needed = self.format["lines_needed"]
 
-    #self.poems = [ [None] * self.lines_needed ] 
+    self.format = poem.get_format()
+    self.lines_needed = self.format["lines_needed"]
 
     self.rhyme_checker = RhymeChecker()
     self.rhyme_checker.debug = False
@@ -127,56 +38,6 @@ class Poemifier:
     #TODO abstract away hash types by format.
     self.rhyme_dict = {}
     self.syllable_count_dict = {}
-
-  def _fill_out_format(self, format):
-    if "lines_needed" not in format:
-      format["lines_needed"] = max(len(format["syllable_structure"]), len(format["rhyme_scheme"]))
-    lines_needed = format["lines_needed"]
-    if "rhyme_scheme" not in format:
-      format["rhyme_scheme"] = "abcdefghijklmnopqrstuvwxyz"[0:format["lines_needed"]]
-    else:
-      format["rhyme_scheme"] = format["rhyme_scheme"] * (lines_needed / len(format["rhyme_scheme"]))
-    if "syllable_structure" in format:
-      if len(format["syllable_structure"]) < lines_needed:
-        multiple = float(lines_needed) / len(format["syllable_structure"])
-        if multiple % 1.0 != 0.0:
-          raise TypeError, "Invalid poem format :("
-        format["syllable_structure"] = int(multiple) * format["syllable_structure"]
-    else:
-      format["syllable_structure"] = [(0, 100)] * format["lines_needed"]
-    if len(format["rhyme_scheme"]) < lines_needed:
-      multiple = float(lines_needed) / len(format["rhyme_scheme"])
-      if multiple % 1.0 != 0.0:
-        raise TypeError, "Invalid poem format :("
-      format["rhyme_scheme"] = int(multiple) * format["rhyme_scheme"]
-    format["unique_syllable_structure"] = set()
-    for syllable_count_item in format["syllable_structure"]:
-      format["unique_syllable_structure"].add(syllable_count_item)
-    format["syllable_count_to_syllable_count_token"] = {}
-
-    for syllable_count_item in format["syllable_structure"]:
-      if isinstance(syllable_count_item, int):
-        if syllable_count_item not in format["syllable_count_to_syllable_count_token"].keys():
-          format["syllable_count_to_syllable_count_token"][syllable_count_item] = set()
-        format["syllable_count_to_syllable_count_token"][syllable_count_item].add(syllable_count_item)
-      elif isinstance(syllable_count_item, tuple):
-        for num in range(syllable_count_item[0],syllable_count_item[1]+1):
-          if num not in format["syllable_count_to_syllable_count_token"].keys():
-            format["syllable_count_to_syllable_count_token"][num] = set()
-          format["syllable_count_to_syllable_count_token"][num].add(syllable_count_item)
-    return format
-
-  def _rime(self, line):
-    """Return this line's last word's rime to use as key to this value in the rhyme hash."""
-    rime = self.rhyme_checker.get_rime(line.split(" ")[-1])
-    if rime:
-      return tuple(rime)
-    else:
-      return False
-
-  def _syllable_count(self, line):
-    """return this line's syllable count to use as key to this value in the syllable_count hash."""
-    return sum(map(self.rhyme_checker.count_syllables, line.split(" ")))
 
   def try_line(self, line):
     """ Add a line, then return True if, given that line, a poem can be created."""
@@ -191,10 +52,9 @@ class Poemifier:
     #TODO: abstract away format stuff
     # format_items = [[self._rime, self.rhyme_dict], [self._syllable_count, self.syllable_count_dict]]
     # for hashFunc, format_hash_dict in format_items:
-
     splits = []
     for syllable_count_token in self.format["unique_syllable_structure"]:
-      splits += self.split_line_at_syllable_count(line, syllable_count_token)
+      splits += line.split_line_at_syllable_count(syllable_count_token)
     for split in splits:
       #TODO: figure out a way to pair these lines, so we don't get stuff split in the middle.
       for part_of_line in split:
@@ -203,9 +63,9 @@ class Poemifier:
     return self._add_line_helper(line)
 
   def _add_line_helper(self, line):
-    syll_count = self._syllable_count(line)
+    syll_count = line.syllable_count()
     if syll_count in self.format["syllable_count_to_syllable_count_token"].keys(): #TODO: obviously, abstract this.
-      rime = self._rime(line)
+      rime = line.rime()
       if not rime:
         return False
       rime = tuple(rime)
@@ -297,13 +157,12 @@ class Poemifier:
         continue
       inner_pairs_by_syll_count = {}
       for syllable_count_token, rhyme_group in rhyme_groups.items():
-
         #exclude words from the rhyme group whose last word is the last word of another line in this rhyme group
         already_used_last_words = set()
         new_rhyme_group = []
         for rhyme_line in rhyme_group:
-          if rhyme_line.split(" ")[-1].lower() not in already_used_last_words:
-            already_used_last_words.add(rhyme_line.split(" ")[-1].lower())
+          if rhyme_line.clean_text().split(" ")[-1].lower() not in already_used_last_words:
+            already_used_last_words.add(rhyme_line.clean_text().split(" ")[-1].lower())
             new_rhyme_group.append(rhyme_line)
 
         inner_pairs_by_syll_count[syllable_count_token] = new_rhyme_group
@@ -345,7 +204,7 @@ class Poemifier:
                 if next_line not in poem: #ensures there are no duplicate lines in poems.
                   poem[index] = next_line
                   break
-      return poem
+      return map(lambda line: line.text, poem)
     # elif self.format["syllable_structure"]:
     #   #TODO: delete all the hash entries that don't fit anything in the syllable structure
     #   raise ShitsFuckedException # I think this is dead code -- or if there's no rhyme scheme.
@@ -376,7 +235,7 @@ class ShitsFuckedException(Exception):
 
 if __name__ == "__main__":
   poem = getattr(poem, sys.argv[1].capitalize())() #class
-  poem_format = sys.argv[1] #TODO remove (I'm keeping this around for backwards compatibility until I totally integrate poem classes)
+  #poem_format = sys.argv[1] #TODO remove (I'm keeping this around for backwards compatibility until I totally integrate poem classes)
   input_text = sys.argv[2] or "./SCALIA.txt"
 
   lists_of_linetexts = map(lambda x: x.split(","), open(sys.argv[2]).read().split("\n"))
@@ -388,31 +247,18 @@ if __name__ == "__main__":
   #  "This is a line that is twenty long", "here are ten more ending in wrong", "Jeremy Bee Merrill plays ping pong",
   #  ]
 
-  p = Poemifier(poem_format)
+  p = Poemifier(poem)
   p.debug = True
   #this can't be a do... while, because we have to add all the lines, then do various processing steps.
   for linetext in linetexts:
-
-    #for line class.
-    # line = Line(linetext, p.rhyme_checker)
-    # if line.should_be_skipped():
-    #   continue
-    # p.try_line(line)
-
-
-
-    if "No." in linetext:
+    line = Line(linetext, p.rhyme_checker)
+    if line.should_be_skipped():
       continue
-    linetext = re.sub("[^A-Za-z \-']", "", linetext)
-    linetext = re.sub("  +", " ", linetext)
-    linetext = linetext.strip()
-    if re.search("\s[BCDEFGHJKLMNOPQRSTUVWXYZ]\s", linetext): #if it contains any abbreviations
-      continue
-    p.try_line(linetext)
+    p.try_line(line)
   print ""
   print p.get_poem(True)
 
-#TODO: for split lines, don't add part of the line unless we can add the rest. Should I have a line object?
+#TODO: for split lines, don't add part of the line unless we can add the rest. Use line class.
 #TODO: write tests
 #TODO: (eventually)
 # Allow multiple poems to be requested (only break when the number of complete poems in self.poems = the number requested)

@@ -6,9 +6,14 @@
 class Poem(object):
   syllable_structure = None
   rhyme_scheme = None
-  lines_needed = None
-  lines = []
+  lines_needed = 0
+  lines = [None] * lines_needed
+  _filled_out_format = None 
+
   def get_format(self):
+    return self._filled_out_format or self.fill_out_format()
+
+  def fill_out_format(self):
     format = {}
     if self.rhyme_scheme:
       format["rhyme_scheme"] = self.rhyme_scheme
@@ -16,10 +21,49 @@ class Poem(object):
       format["lines_needed"] = self.lines_needed
     if self.syllable_structure:
       format["syllable_structure"] = self.syllable_structure
+
+    if "lines_needed" not in format:
+      format["lines_needed"] = max(len(format["syllable_structure"]), len(format["rhyme_scheme"]))
+    lines_needed = format["lines_needed"]
+    if "rhyme_scheme" not in format:
+      format["rhyme_scheme"] = "abcdefghijklmnopqrstuvwxyz"[0:format["lines_needed"]]
+    else:
+      format["rhyme_scheme"] = format["rhyme_scheme"] * (lines_needed / len(format["rhyme_scheme"]))
+    if "syllable_structure" in format:
+      if len(format["syllable_structure"]) < lines_needed:
+        multiple = float(lines_needed) / len(format["syllable_structure"])
+        if multiple % 1.0 != 0.0:
+          raise TypeError, "Invalid poem format :("
+        format["syllable_structure"] = int(multiple) * format["syllable_structure"]
+    else:
+      format["syllable_structure"] = [(0, 100)] * format["lines_needed"]
+    if len(format["rhyme_scheme"]) < lines_needed:
+      multiple = float(lines_needed) / len(format["rhyme_scheme"])
+      if multiple % 1.0 != 0.0:
+        raise TypeError, "Invalid poem format :("
+      format["rhyme_scheme"] = int(multiple) * format["rhyme_scheme"]
+    format["unique_syllable_structure"] = set()
+    for syllable_count_item in format["syllable_structure"]:
+      format["unique_syllable_structure"].add(syllable_count_item)
+    format["syllable_count_to_syllable_count_token"] = {}
+
+    for syllable_count_item in format["syllable_structure"]:
+      if isinstance(syllable_count_item, int):
+        if syllable_count_item not in format["syllable_count_to_syllable_count_token"].keys():
+          format["syllable_count_to_syllable_count_token"][syllable_count_item] = set()
+        format["syllable_count_to_syllable_count_token"][syllable_count_item].add(syllable_count_item)
+      elif isinstance(syllable_count_item, tuple):
+        for num in range(syllable_count_item[0],syllable_count_item[1]+1):
+          if num not in format["syllable_count_to_syllable_count_token"].keys():
+            format["syllable_count_to_syllable_count_token"][num] = set()
+          format["syllable_count_to_syllable_count_token"][num].add(syllable_count_item)
+    self._filled_out_format = format
     return format
 
   def sing(self):
     raise NotYetImplementedError
+
+
 
 class Haiku(Poem):
   syllable_structure = [5,7,5]
