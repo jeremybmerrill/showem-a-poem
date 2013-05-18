@@ -1,3 +1,6 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from rhymechecker import RhymeChecker
 from random import randint
 import sys
