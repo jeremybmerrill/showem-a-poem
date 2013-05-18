@@ -16,7 +16,17 @@ Architecture:
   e.g. python poemifier.py sonnet ./SCALIA.txt 
 """
 
-#TODO: use espeak, add pitch to "sing" the poems
+#TODO integrate with poem classes.
+#TODO write line class
+
+class Line:
+  #lines have text, a rime, and sometimes siblings (if the line comes from a split line-of-text)
+  text = None
+  siblings = None
+  rime = None
+  def __init__(self, text):
+    self.text = text
+
 class Poemifier:
   def __init__(self, format_name, format=None):
     """Specify the name of a known format or specify a fully-defined format."""
