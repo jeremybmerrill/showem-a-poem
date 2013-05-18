@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from rhymechecker import RhymeChecker
-from random import randint
+from random import randint, shuffle
 import sys
 """
 Architecture:
@@ -17,7 +17,6 @@ Architecture:
 """
 
 #TODO: use espeak, add pitch to "sing" the poems
-
 class Poemifier:
   def __init__(self, format_name, format=None):
     """Specify the name of a known format or specify a fully-defined format."""
@@ -28,7 +27,8 @@ class Poemifier:
         "limerick" : {"syllable_structure" : [(9,11),(9, 11),6,6,(9, 11)], 
                        "rhyme_scheme" : "aabba"},
         "sonnet" : {"syllable_structure" : [10],
-                      "rhyme_scheme" :  "ababcdcdefefgg"}
+                      "rhyme_scheme" :  "ababcdcdefefgg"},
+        "freeverse" : {"lines_needed" : 10}
       }
     self.debug = False
     #self.poem_complete = False #dunno what this is.
@@ -41,6 +41,7 @@ class Poemifier:
     self.format = self._fill_out_format(self.formats[format_name])
     self.lines_needed = self.format["lines_needed"]
 
+    self.partial_lines = {}
     #self.poems = [ [None] * self.lines_needed ] 
 
     self.rhyme_checker = RhymeChecker()
@@ -53,13 +54,19 @@ class Poemifier:
   def _fill_out_format(self, format):
     if "lines_needed" not in format:
       format["lines_needed"] = max(len(format["syllable_structure"]), len(format["rhyme_scheme"]))
-      lines_needed = format["lines_needed"]
-    rhyme_scheme = format["rhyme_scheme"] * (lines_needed / len(format["rhyme_scheme"]))
-    if len(format["syllable_structure"]) < lines_needed:
-      multiple = float(lines_needed) / len(format["syllable_structure"])
-      if multiple % 1.0 != 0.0:
-        raise TypeError, "Invalid poem format :("
-      format["syllable_structure"] = int(multiple) * format["syllable_structure"]
+    lines_needed = format["lines_needed"]
+    if "rhyme_scheme" not in format:
+      format["rhyme_scheme"] = "abcdefghijklmnopqrstuvwxyz"[0:format["lines_needed"]]
+    else:
+      format["rhyme_scheme"] = format["rhyme_scheme"] * (lines_needed / len(format["rhyme_scheme"]))
+    if "syllable_structure" in format:
+      if len(format["syllable_structure"]) < lines_needed:
+        multiple = float(lines_needed) / len(format["syllable_structure"])
+        if multiple % 1.0 != 0.0:
+          raise TypeError, "Invalid poem format :("
+        format["syllable_structure"] = int(multiple) * format["syllable_structure"]
+    else:
+      format["syllable_structure"] = [(0, 100)] * format["lines_needed"]
     if len(format["rhyme_scheme"]) < lines_needed:
       multiple = float(lines_needed) / len(format["rhyme_scheme"])
       if multiple % 1.0 != 0.0:
@@ -108,15 +115,14 @@ class Poemifier:
     # format_items = [[self._rime, self.rhyme_dict], [self._syllable_count, self.syllable_count_dict]]
     # for hashFunc, format_hash_dict in format_items:
 
-    #try splitting line and call _add_line_helper on that.
-
     splits = []
     for syllable_count_token in self.format["unique_syllable_structure"]:
       splits += self.split_line_at_syllable_count(line, syllable_count_token)
     for split in splits:
-      #TODO: figure out a way to put these together.
-      for inner_split in split:
-        self._add_line_helper(inner_split)
+      #TODO: figure out a way to pair these lines, so we don't get stuff split in the middle.
+      for part_of_line in split:
+        self._add_line_helper(part_of_line)
+        self.partial_lines[part_of_line] = filter(lambda x: x != part_of_line, split)
     return self._add_line_helper(line)
 
   def _add_line_helper(self, line):
@@ -219,8 +225,8 @@ class Poemifier:
         already_used_last_words = set()
         new_rhyme_group = []
         for rhyme_line in rhyme_group:
-          if rhyme_line.split(" ")[-1] not in already_used_last_words:
-            already_used_last_words.add(rhyme_line.split(" ")[-1])
+          if rhyme_line.split(" ")[-1].lower() not in already_used_last_words:
+            already_used_last_words.add(rhyme_line.split(" ")[-1].lower())
             new_rhyme_group.append(rhyme_line)
 
         inner_pairs_by_syll_count[syllable_count_token] = new_rhyme_group
@@ -233,37 +239,57 @@ class Poemifier:
   def get_poem(self, random=False):
     """ Return False or a poem. """
     #TODO: again, abstraction!
+
+    #TODO: skip 
     poem = [None] * self.format["lines_needed"]
     if self.format["rhyme_scheme"]:
       #print "pairs: " +  str(self._pair_rhyme_lines())
       pairs = self._pair_rhyme_lines()
-      for syllable_count_token in self.format["unique_syllable_structure"]:
-        if syllable_count_token not in pairs:
-          return None
-        candidate_lines = filter(lambda rhymes: len(rhymes) >= self.format["syllable_structure"].count(syllable_count_token), pairs[syllable_count_token].values())
-        if not candidate_lines:
-          return None
-        this_sylls_lines = list(candidate_lines[randint(0,len(candidate_lines) - 1) if random else 0 ])
-        for index, syllable_count in enumerate(self.format["syllable_structure"]):
-          if syllable_count == syllable_count_token:
-            poem[index] = this_sylls_lines.pop()
+      unique_rhyme_scheme = set(list(self.format["rhyme_scheme"]))
+      for rhyme_element in unique_rhyme_scheme:
+        for syllable_count_token in self.format["unique_syllable_structure"]:
+          if syllable_count_token not in pairs:
+            return None
+          #get all the sets of rhyming lines that have at least enough rhymes to fit what we need for this syllable count.
+          candidate_lines = filter(lambda rhymes: len(rhymes) >= self.format["syllable_structure"].count(syllable_count_token), 
+                                    pairs[syllable_count_token].values())
+          if not candidate_lines:
+            return None
+
+            #TODO:
+          #for each set of lines in candidate lines, check if it has any partials
+          #and if so, whether, the following/preceding line(s) fit in the next slot.
+          #throw it out if not.
+          if random:
+            shuffle(candidate_lines)
+          this_sylls_lines = list(candidate_lines[0])
+
+          for index, syllable_count in enumerate(self.format["syllable_structure"]):
+            if syllable_count == syllable_count_token and rhyme_element == self.format["rhyme_scheme"][index]:
+              for next_line in this_sylls_lines:
+                if next_line not in poem: #ensures there are no duplicate lines in poems.
+                  poem[index] = next_line
+                  break
       return poem
-    elif self.format["syllable_structure"]:
-      #TODO: delete all the hash entries that don't fit anything in the syllable structure
-      raise ShitsFuckedException # I think this is dead code.
-      for index, syllable_count in enumerate(self.format["syllable_structure"]):
-        if syllable_count not in self.syllable_count_dict:
-          return None 
-        candidate_lines = filter(lambda l: l not in poem, self.syllable_count_dict[syllable_count])
-        if not candidate_lines:
-          return None
-        if random:
-          next_line_index = randint(0,len(candidate_lines) - 1)
-        else:
-          next_line_index = 0
-        next_line = candidate_lines[next_line_index]
-        poem[index] = next_line
-      return poem
+    # elif self.format["syllable_structure"]:
+    #   #TODO: delete all the hash entries that don't fit anything in the syllable structure
+    #   raise ShitsFuckedException # I think this is dead code -- or if there's no rhyme scheme.
+    #   for index, syllable_count in enumerate(self.format["syllable_structure"]):
+    #     if syllable_count not in self.syllable_count_dict:
+    #       return None 
+    #     candidate_lines = filter(lambda l: l not in poem, self.syllable_count_dict[syllable_count])
+    #     if not candidate_lines:
+    #       return None
+    #     if random:
+    #       next_line_index = randint(0,len(candidate_lines) - 1)
+    #     else:
+    #       next_line_index = 0
+    #     next_line = candidate_lines[next_line_index]
+    #     poem[index] = next_line
+    #   return poem
+    # else:
+    #   #there's no rhyme scheme or syllable structure.
+    #   pass
 
 def _test():
   import doctest
@@ -291,9 +317,10 @@ if __name__ == "__main__":
   p.debug = True
   #this can't be a do... while, because we have to add all the lines, then do various processing steps.
   for line in lines:
-    if "No. " in line:
+    if "No." in line:
       continue
-    line = re.sub("[^A-Za-z ']", "", line)
+    line = re.sub("[^A-Za-z \-']", "", line)
+    line = re.sub("  +", " ", line)
     line = line.strip()
     if re.search("\s[BCDEFGHJKLMNOPQRSTUVWXYZ]\s", line): #if it contains any abbreviations
       continue
@@ -308,8 +335,7 @@ if __name__ == "__main__":
   print ""
   print p.get_poem(True)
 
-
 #TODO: make split lines work.
-
+#TODO: write tests
 #TODO: (eventually)
 # Allow multiple poems to be requested (only break when the number of complete poems in self.poems = the number requested)

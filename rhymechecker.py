@@ -17,7 +17,6 @@ from syllable_count_guesser import SyllableCountGuesser
   Pronunciation: 
 """
 
-
 class RhymeChecker:
   def __init__(self, syllabizer=None):
     RhymeChecker.vowels = []
