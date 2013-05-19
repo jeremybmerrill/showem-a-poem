@@ -19,8 +19,7 @@ Architecture:
   e.g. python poemifier.py sonnet ./SCALIA.txt 
 """
 
-#TODO integrate with poem classes.
-#TODO write line class
+#TODO: make a Heroku/Flask-based app for people to make their own poems.
 
 class Poemifier:
   def __init__(self, poem):
@@ -38,6 +37,8 @@ class Poemifier:
     #TODO abstract away hash types by format.
     self.rhyme_dict = {}
     self.syllable_count_dict = {}
+    # self.global_only_once = 100
+
 
   def try_line(self, line):
     """ Add a line, then return True if, given that line, a poem can be created."""
@@ -145,17 +146,18 @@ class Poemifier:
     words_to_compare_to = map(lambda x: x.split(" ")[-1], lines_to_compare_to )
     return True in map(lambda x: self.rhyme_checker.rhymes_with(last_word, x), words_to_compare_to)
 
-  def _pair_rhyme_lines(self):
-    """Pair lines that rhyme."""
+  def _group_lines_by_rime(self):
+    """Group lines with the same syllable count and then by rime."""
     #all the lines in any of the dicts are guaranteed to be of acceptable length.
-    #pairs = {"EH" => {6 => ["a", "b", "c"], (9,11) => ["a", "b", "c"]}, "OI" => ...}
-    pairs_by_rhyme = {}
-    pairs_by_syll_count = {}
+    #groups = {6 => {"EH" => ["a", "b", "c"], "OI" => ...}, (9,11) => { "AH" => ["a", "b", "c"] "UH" => ...}, }
+
+    groups_by_rhyme = {}
+    groups_by_syll_count = {}
     for rime, rhyme_groups in self.rhyme_dict.items():
       if len(rhyme_groups) == 1 and len(rhyme_groups.values()[0]) == 1:
-        #print("skipping something while pairing")
+        #print("skipping something while grouping")
         continue
-      inner_pairs_by_syll_count = {}
+      inner_groups_by_syll_count = {}
       for syllable_count_token, rhyme_group in rhyme_groups.items():
         #exclude words from the rhyme group whose last word is the last word of another line in this rhyme group
         already_used_last_words = set()
@@ -165,28 +167,49 @@ class Poemifier:
             already_used_last_words.add(rhyme_line.clean_text().split(" ")[-1].lower())
             new_rhyme_group.append(rhyme_line)
 
-        inner_pairs_by_syll_count[syllable_count_token] = new_rhyme_group
-        if syllable_count_token not in pairs_by_syll_count.keys():
-          pairs_by_syll_count[syllable_count_token] = {}
-        pairs_by_syll_count[syllable_count_token][rime] = new_rhyme_group
-      pairs_by_rhyme[rime] = inner_pairs_by_syll_count
-    return pairs_by_syll_count
+        inner_groups_by_syll_count[syllable_count_token] = new_rhyme_group
+        if syllable_count_token not in groups_by_syll_count.keys():
+          groups_by_syll_count[syllable_count_token] = {}
+        groups_by_syll_count[syllable_count_token][rime] = new_rhyme_group
+      groups_by_rhyme[rime] = inner_groups_by_syll_count
+    return groups_by_syll_count
+
+  def _prune_grouped_lines(self, groups):
+    """ Return groups, minus rimes with too few members.
+
+      The returned dict contains only lines that are eligible to appear in the poem.
+    """
+    # if self.global_only_once == 0:
+    #   print groups
+    # self.global_only_once -= 1
+    new_groups = {}
+    for syllcount, syllcount_group in groups.items():
+      new_groups[syllcount] = {}
+      for rime, rime_group in syllcount_group.items():
+        if len(rime_group) >= self.format["syllable_structure"].count(syllcount):
+          new_groups[syllcount][rime] = rime_group
+    return new_groups 
 
   def get_poem(self, random=False):
     """ Return False or a poem. """
     #TODO: again, abstraction!
     poem = [None] * self.format["lines_needed"]
     if self.format["rhyme_scheme"]:
-      #print "pairs: " +  str(self._pair_rhyme_lines())
-      pairs = self._pair_rhyme_lines()
+      groups = self._group_lines_by_rime()
+      groups = self._prune_grouped_lines(groups)
+      print len(groups.get(6, ""))
+      print len(groups.get((9,11), ""))
+      print ""
+      #filter out partial-lines whose siblings aren't in `groups`.
+
       unique_rhyme_scheme = set(list(self.format["rhyme_scheme"]))
       for rhyme_element in unique_rhyme_scheme:
         for syllable_count_token in self.format["unique_syllable_structure"]:
-          if syllable_count_token not in pairs:
+          if syllable_count_token not in groups:
             return None
           #get all the sets of rhyming lines that have at least enough rhymes to fit what we need for this syllable count.
           candidate_lines = filter(lambda rhymes: len(rhymes) >= self.format["syllable_structure"].count(syllable_count_token), 
-                                    pairs[syllable_count_token].values())
+                                    groups[syllable_count_token].values())
           if not candidate_lines:
             return None
 
@@ -207,7 +230,7 @@ class Poemifier:
       return map(lambda line: line.text, poem)
     # elif self.format["syllable_structure"]:
     #   #TODO: delete all the hash entries that don't fit anything in the syllable structure
-    #   raise ShitsFuckedException # I think this is dead code -- or if there's no rhyme scheme.
+    #   raise ShitsFuckedException # I think this is dead code
     #   for index, syllable_count in enumerate(self.format["syllable_structure"]):
     #     if syllable_count not in self.syllable_count_dict:
     #       return None 
@@ -231,6 +254,7 @@ def _test():
 
 class ShitsFuckedException(Exception):
   pass
+
 
 
 if __name__ == "__main__":
@@ -260,5 +284,4 @@ if __name__ == "__main__":
 
 #TODO: for split lines, don't add part of the line unless we can add the rest. Use line class.
 #TODO: write tests
-#TODO: (eventually)
-# Allow multiple poems to be requested (only break when the number of complete poems in self.poems = the number requested)
+#TODO: Allow multiple poems to be requested (only break when the number of complete poems in self.poems = the number requested)

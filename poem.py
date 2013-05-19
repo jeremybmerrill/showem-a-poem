@@ -61,6 +61,8 @@ class Poem(object):
     return format
 
   def sing(self):
+    class NotYetImplementedError(Exception):
+      pass
     raise NotYetImplementedError
 
 
@@ -69,7 +71,7 @@ class Haiku(Poem):
   syllable_structure = [5,7,5]
   rhyme_scheme = "abc"
 
-class FreeVerse(Poem):
+class Freeverse(Poem):
   def __init__(self, lines_needed=10):
     self.lines_needed = lines_needed
 
@@ -81,5 +83,3 @@ class Sonnet(Poem):
   syllable_structure = [10]
   rhyme_scheme = "ababcdcdefefgg"
 
-class NotYetImplementedError(Exception):
-  pass
