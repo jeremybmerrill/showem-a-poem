@@ -43,7 +43,8 @@ class Line:
     case_citations = " v." in self.text
     blank = self.clean_text().strip() == ""
     nonwords = False in [re.search("aeiouy", word) for word in self.clean_text().split(" ")]
-    return number_abbrev or other_abbrev or case_citations or blank or nonwords
+    numbers = re.search("[0-9]", self.text)
+    return number_abbrev or other_abbrev or case_citations or blank or nonwords or numbers
 
   def clean_text(self):
     if self._cleaned_text:

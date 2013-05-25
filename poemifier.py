@@ -293,13 +293,14 @@ class Poemifier:
 
       self._prune_too_small_grouped_lines(groups)
       if not self.allow_partial_lines:
-        print "before: " + str(len(groups.get(5, "")))
-        print "before: " + str(len(groups.get(5, "")))
+        # print "before: " + str(len(groups.get(5, "")))
+        # print "before: " + str(len(groups.get(5, "")))
         self._prune_desiblinged_lines_from_groups(groups)
         self._prune_too_small_grouped_lines(groups)
-        print "after: " + str(len(groups.get(5, "")))
-        print "after: " + str(len(groups.get(7, "")))
-        print ""
+        # print "after, 5: " + str(len(groups.get(5, "")))
+        # print "after, 7: " + str(len(groups.get(7, "")))
+        # print "7: " + str(groups.get(7, ""))
+        # print ""
 
       unique_rhyme_scheme = set(list(self.format["rhyme_scheme"]))
       for rhyme_element in unique_rhyme_scheme:
@@ -312,6 +313,8 @@ class Poemifier:
           candidate_lines = groups[syllable_count_token].values()
           if be_random:
             shuffle(candidate_lines)
+
+          # print "candidate lines: %(c)s" % {'c' : candidate_lines}
 
           if not candidate_lines:
             continue
@@ -326,23 +329,37 @@ class Poemifier:
             for index, syllable_count in enumerate(self.format["syllable_structure"]):
               if syllable_count == syllable_count_token and rhyme_element == self.format["rhyme_scheme"][index]:
                 for next_line in this_sylls_lines:
-                  if poem[index] == None and next_line not in poem: #ensures there are no duplicate lines in poems.
+                  if not poem[index] and next_line not in poem: #ensures there are no duplicate lines in poems.
                     if (not self.allow_partial_lines) and next_line.is_partial():
-                      if line in self.where_to_put_partial_lines:
-                        if index in self.where_to_put_partial_lines[line]:
-                          print "line " + str(index) + " is partial and acceptable"
+                      if next_line in self.where_to_put_partial_lines:
+                        if index in self.where_to_put_partial_lines[next_line]:
+                          # print "line " + str(index) + " is partial and acceptable"
                           poem[index] = next_line
                           for j, sibling in enumerate(next_line.after_siblings()):
-                            #these can be depended on to fit the write syllable structure
-                            poem[j] = sibling
-                            continue
-                      else:
-                        if line.text != "":
-                          print str(line) + " didn't make it"
+                            #these can be depended on to fit the right syllable structure
+                            poem[j + 1 + index] = sibling
+                            # print "slotted in a sibling to line #%(i)s" % {'i': j + index}
+                      #   else:
+                      #     print "line %(l)s doesn't fit in line %(n)s" % {'l' : next_line, 'n' : index}
+                      # else:
+                      #   if next_line.text != "":
+                      #     print str(next_line) + " didn't make it"
                     else:
-                      print "line " + str(index) + " partial? " + str(next_line.is_partial())
+                      # print "line " + str(index) + " partial? " + str(next_line.is_partial())
                       poem[index] = next_line
                       continue
+                  # else:
+                  #   if poem[index]:
+                  #     print "skipping because line is already filled"
+                  #   if next_line in poem: 
+                  #     print "skipping because next_line already in poem"
+                  #   print ""
+              # else:
+              #   pass
+                # print "skipped %(l)s due to syllable/rhyme problems" % {'l' : this_sylls_lines}
+                # print "syllable_count: %(sc)s , syllable_count_token: %(sct)s" % {'sc': syllable_count, 'sct': syllable_count_token}
+                # print "rhyme_element: %(sc)s , self.format[rhyme_scheme][index]: %(sct)s" % {'sc': rhyme_element, 'sct': self.format["rhyme_scheme"][index]}
+                # print ""
       # if not self.allow_partial_lines:
       #   print "generated " + str(len(poems)) + " semivalid poems"
       #   poems = self._cull_desiblinged_lines_from_poems(poems)
