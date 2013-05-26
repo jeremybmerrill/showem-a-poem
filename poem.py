@@ -1,8 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-#TODO: use espeak, add pitch to "sing" the poems
-
 class Poem(object):
   syllable_structure = None
   rhyme_scheme = None
@@ -36,7 +34,7 @@ class Poem(object):
           raise TypeError, "Invalid poem format :("
         format["syllable_structure"] = int(multiple) * format["syllable_structure"]
     else:
-      format["syllable_structure"] = [(0, 100)] * format["lines_needed"]
+      format["syllable_structure"] = [(0, 100)] * format["lines_needed"] #TODO: make this "any", make stuff more efficient
     if len(format["rhyme_scheme"]) < lines_needed:
       multiple = float(lines_needed) / len(format["rhyme_scheme"])
       if multiple % 1.0 != 0.0:

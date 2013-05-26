@@ -82,7 +82,7 @@ class Line:
 
     first_syll_count = syllable_counts[0]
     syllable_counts = syllable_counts[1:]
-    splits = self.split_line_at_syllable_count(first_syll_count) #TODO rename
+    splits = self.split_line_at_syllable_count(first_syll_count)
     #print "splits: " + str(splits)
     if not splits: #either [] (in base failure case) or False (as it recurses upwards)
       return False

@@ -80,8 +80,6 @@ class Poemifier:
         splits += line.split_line_at_syllable_count(syllable_count_token)
 
     for split in splits:
-      #TODO: figure out a way to pair these lines, so we don't get stuff split in the middle.
-      # alternatively, find a way to "tentatively" add the lines and remove them immediately if the split lines aren't kosher.
       if self.allow_partial_lines:
         for part_of_line in split:
           self._add_line_helper(part_of_line)
@@ -177,7 +175,7 @@ class Poemifier:
       #groups[syllcount] = {}
       for rime, rime_group in syllcount_group.items():
         partials = sum([1 for l in rime_group if l.is_partial() and l.rime() == l.after_siblings()[0].rime() ])
-        #TODO: only add partials that rime with their prev sibling
+        #TODO: only add partials that rime with their prev sibling (or is this necessary?)
         rime_group_effective_length = len(rime_group) + partials
 
         #conscious decision: not >=
@@ -189,7 +187,6 @@ class Poemifier:
   def _prune_desiblinged_lines_from_groups(self, groups):
     """filter out partial-lines whose siblings aren't in `groups`, in place"""
 
-    #TODO:
     #for each partial-line, figure out what order of syllable and rhyme structures would be needed to slot it into the poem
     #e.g. it's got two pieces that rhyme of 9-11 syllables each
     #remove those partial lines who can't fit anywhere. don't accept the partial line if it's picked where it can't fit.
@@ -312,11 +309,6 @@ class Poemifier:
           if not candidate_lines:
             continue
  
-          #TODO:
-          #for each set of lines in candidate lines, check if it has any partial lines
-          #and if so, whether, the following/preceding line(s) fit in the next slot.
-          #throw it out if not.
-
           #for each syllable in the candidate lines for this syllable_count_token, create a poem
           for this_sylls_lines in candidate_lines:
             for index, syllable_count in enumerate(self.format["syllable_structure"]):
@@ -396,6 +388,6 @@ if __name__ == "__main__":
   print ""
   print p.create_poem(True)
 
-#TODO: for split lines, don't add part of the line unless we can add the rest. Use line class.
 #TODO: write tests
 #TODO: Allow multiple poems to be requested (only break when the number of complete poems in self.poems = the number requested)
+#TODO: use espeak, add pitch to "sing" the poems
