@@ -38,6 +38,7 @@ class Poemifier:
     self.rhyme_checker.debug = False
 
     self.allow_partial_lines = False
+    self.verbose = False
     self.where_to_put_partial_lines = {}
     self.asdf = {}
 
@@ -72,7 +73,7 @@ class Poemifier:
       #print splits
     else:
       raise YourHandsUpInTheAirTonight
-      #this bit is left over, totally wrong.
+      #TODO: this bit is left over, totally wrong.
       #it needs to add correctly-split versions (at each token) for all parts of the sentence
       #right now it just correctly splits the first N syllables of the sentences for each token
       for syllable_count_token in self.format["unique_syllable_structure"]:
@@ -85,7 +86,7 @@ class Poemifier:
         for part_of_line in split:
           self._add_line_helper(part_of_line)
       else:
-        #if partial lines aren't allowed, don't bother adding non-beginning parts of partial lines to the hashes.
+        #if partial lines aren't allowed, only add the first part of partial lines to the hashes; don't bother adding the rest.
         self._add_line_helper(split[0])
     return self._add_line_helper(line)
 
@@ -128,17 +129,21 @@ class Poemifier:
     return True in map(lambda x: self.rhyme_checker.rhymes_with(last_word, x), words_to_compare_to)
 
   def _group_lines_by_rime(self):
-    """Group lines with the same syllable count and then by rime."""
-    #all the lines in any of the dicts are guaranteed to be of acceptable length.
-    #groups = {6 => {"EH" => ["a", "b", "c"], "OI" => ...}, (9,11) => { "AH" => ["a", "b", "c"] "UH" => ...}, }
+    """Group lines with the same syllable count and then by rime.
+
+    all the lines in any of the dicts are guaranteed to be of acceptable length.
+    e.g. groups = {6 => {"EH" => ["a", "b", "c"], "OI" => ...}, (9,11) => { "AH" => ["a", "b", "c"] "UH" => ...}, }
+    """
+    #print self.rhyme_dict[(('UW', 'L'),)]
 
     groups_by_rhyme = {}
     groups_by_syll_count = {}
     for rime, rhyme_groups in self.rhyme_dict.items():
       #skip rhyme dict entries with only one element, unless there are unrhyming elements in the rhyme scheme
       if len(rhyme_groups) == 1 and len(rhyme_groups.values()[0]) == 1 and \
+          (self.allow_partial_lines or not rhyme_groups.values()[0][0].is_partial()) and \
             not filter(lambda item: self.format["rhyme_scheme"].count(item) == 1, list(self.format["rhyme_scheme"])):
-        #print("skipping something while grouping")
+        print "skipping %(l)s while grouping" % {'l' : rhyme_groups.values()[0]}
         continue
       inner_groups_by_syll_count = {}
       for syllable_count_token, rhyme_group in rhyme_groups.items():
@@ -163,17 +168,20 @@ class Poemifier:
 
       The returned dict contains only lines that are eligible to appear in the poem.
       A rime_group has too few members iff:
-        1. Its count of members is less than the number
+        1. Its count of members is less than the minimum count of unique 
+            elements in syllable structure or rhyme scheme.
     """
     #groups = {}
     min_rime_count = min(list(set(map(lambda x: self.format["rhyme_scheme"].count(x), self.format["rhyme_scheme"] ))))
     for syllcount, syllcount_group in groups.items():
       #groups[syllcount] = {}
       for rime, rime_group in syllcount_group.items():
-        if len(rime_group) >= min(self.format["syllable_structure"].count(syllcount), min_rime_count):
-          #groups[syllcount][rime] = rime_group
-          continue
-        else:
+        partials = sum([1 for l in rime_group if l.is_partial() and l.rime() == l.after_siblings()[0].rime() ])
+        #TODO: only add partials that rime with their prev sibling
+        rime_group_effective_length = len(rime_group) + partials
+
+        #conscious decision: not >=
+        if rime_group_effective_length < min(self.format["syllable_structure"].count(syllcount), min_rime_count):
           del groups[syllcount][rime]
       if len(syllcount_group) == 0:
         del groups[syllcount]
@@ -231,9 +239,9 @@ class Poemifier:
                 if rhyme_symbol in mini_rhyme_rime_map:
                   #TODO: compare only the last N syllables in rime for N = min(len(rime1, rime2))
                   min_rime_size = min( len(mini_rhyme_rime_map[rhyme_symbol]), len(sibling_line.rime()))
-                  if mini_rhyme_rime_map[rhyme_symbol][-min_rime_size:] != sibling_line.rime()[-min_rime_size]:
+                  if mini_rhyme_rime_map[rhyme_symbol][-min_rime_size:] != (sibling_line.rime()[-min_rime_size],):
                     okay[-1] = False
-                    print "failed on rhyme"
+                    #print "failed on rhyme: %(r1)s; %(r2)s" % {'r1': mini_rhyme_rime_map[rhyme_symbol][-min_rime_size:], 'r2':  (sibling_line.rime()[-min_rime_size],)}
                     break
                 else:
                   mini_rhyme_rime_map[rhyme_symbol] = tuple(sibling_line.rime()) if sibling_line.rime() else False
@@ -243,32 +251,6 @@ class Poemifier:
             else:
               self.where_to_put_partial_lines[line] = [i for i, b in enumerate(okay) if b]
               #store where it's okay.
-
-            #TODO: does this line and its sibling fit one of the formats in sequential_format_orderings ?
-
-            # # all_siblings_survive = True
-            # # for sibling in line.before_siblings():
-            # #   all_siblings_survive = all_siblings_survive and sibling in flat_list_of_kosher_lines
-            # # for sibling in line.after_siblings():
-            # #   all_siblings_survive = all_siblings_survive and sibling in flat_list_of_kosher_lines
-            # # if not all_siblings_survive:
-            # #   rime_group.remove(line)
-
-  # def _cull_desiblinged_lines_from_poems(self, poems):
-  #   """ Remove those poems that contain a split line without its siblings."""
-  #   new_poems = []
-  #   for poem in poems:
-  #     valid = True
-  #     for index, line in enumerate(poem):
-  #       if line.is_partial() and line.next_sibling():
-  #         if len(poem) == (index + 1) or line.next_sibling() != poem[index + 1]:
-  #           valid = False
-  #       if line.is_partial() and line.prev_sibling():
-  #         if index == 0 or line.prev_sibling() != poem[index - 1]:
-  #           valid = False
-  #     if valid:
-  #       new_poems.append(poem)
-  #   return new_poems
 
   def _shuffle_grouped_lines(self, groups):
     for syllcount, syllcount_group in groups.items():
@@ -291,16 +273,27 @@ class Poemifier:
                           # flat_lines = [item.text for subl2 in [item for sublist in [d.values() for d in groups.values()] for item in sublist] for item in subl2]
                           # print [debug_line in flat_lines for debug_line in debug_lines]
 
+      if self.verbose:
+        for syllable_count in list(self.format["unique_syllable_structure"]):
+          print "before pruning too small1, %(s)s: %(l)s" % {'s' : syllable_count, 'l': str(len(groups.get(syllable_count, "")))}
+        print "6: " + str(groups.get(6, ""))
       self._prune_too_small_grouped_lines(groups)
       if not self.allow_partial_lines:
-        # print "before: " + str(len(groups.get(5, "")))
-        # print "before: " + str(len(groups.get(5, "")))
+        if self.verbose:
+          for syllable_count in list(self.format["unique_syllable_structure"]):
+            print "before pruning desiblinged, %(s)s: %(l)s" % {'s' : syllable_count, 'l': str(len(groups.get(syllable_count, "")))}
+          print "6: " + str(groups.get(6, ""))
         self._prune_desiblinged_lines_from_groups(groups)
+        if self.verbose:
+          for syllable_count in list(self.format["unique_syllable_structure"]):
+            print "before pruning too small2, %(s)s: %(l)s" % {'s' : syllable_count, 'l': str(len(groups.get(syllable_count, "")))}
+          print "6: " + str(groups.get(6, ""))
         self._prune_too_small_grouped_lines(groups)
-        # print "after, 5: " + str(len(groups.get(5, "")))
-        # print "after, 7: " + str(len(groups.get(7, "")))
-        # print "7: " + str(groups.get(7, ""))
-        # print ""
+        if self.verbose:
+          for syllable_count in list(self.format["unique_syllable_structure"]):
+            print "after, %(s)s: %(l)s" % {'s' : syllable_count, 'l': str(len(groups.get(syllable_count, "")))}
+          print "6: " + str(groups.get(6, ""))
+          print ""
 
       unique_rhyme_scheme = set(list(self.format["rhyme_scheme"]))
       for rhyme_element in unique_rhyme_scheme:
@@ -333,7 +326,8 @@ class Poemifier:
                     if (not self.allow_partial_lines) and next_line.is_partial():
                       if next_line in self.where_to_put_partial_lines:
                         if index in self.where_to_put_partial_lines[next_line]:
-                          # print "line " + str(index) + " is partial and acceptable"
+                          if self.verbose:
+                            print "line %(i)s (%(l)s) is partial and acceptable" %{'i': index , 'l': next_line}
                           poem[index] = next_line
                           for j, sibling in enumerate(next_line.after_siblings()):
                             #these can be depended on to fit the right syllable structure
@@ -366,87 +360,6 @@ class Poemifier:
       #print "generated " + str(len(poems)) + " valid poems"
 
       return poem
-
-      """
-      #for each line (a combination of syllable count and rhyme -- for now (needs abstraction))
-      #randomly pick an eligible line from the dicts
-      #if the line picked has an after siblings, put it next if they fit, otherwise "rewind".
-      #look ahead only once.
-      #oppa linkedlist style
-      first_in_first = groups[groups[groups.keys[0]].keys[0]][0]
-      if random:
-        first_in_first = groups[groups[groups.keys[0]].keys[0]][0]
-        self._shuffle_grouped_lines(groups)
-        print "should often differ: '" + groups[groups[groups.keys[0]].keys[0]][0] + "' ; '" + "'"
-
-      rhyme_rime_mapping = {} #maps rhyme key (e.g. 'a' ) to a rime (e.g. "EH")
-      for index, rhyme_key_syllable_count_token in enumerate(zip(list(self.format["rhyme_scheme"], self.format["syllable_structure"]))):
-        rhyme_key, syllable_count_token = rhyme_key_syllable_count_token
-        if rhyme_key in rhyme_rime_mapping:
-          this_rime = rhyme_rime_mapping[rhyme_key]
-        else:
-          this_rime = groups[syllable_count_token].keys()[0]
-          rhyme_rime_mapping[rhyme_key] = this_rime
-
-        if index == 0 or not poem[index-1].next_sibling():
-          poem[index] = groups[syllable_count_token][this_rime].pop()
-        else:
-          if poem[index-1].next_sibling() in groups[syllable_count_token][this_rime]
-            poem[index] = poem[index-1].next_sibling()
-          else:
-            for i, rewind_line in enumerate(poem.reverse()):
-              if poem[i] == None:
-                continue
-              if poem[i]
-            #rewind: erase poem, rhyme_rime_mapping until last safe index
-      """
-      """
-      unique_rhyme_scheme = set(list(self.format["rhyme_scheme"]))
-      for rhyme_element in unique_rhyme_scheme:
-        for syllable_count_token in self.format["unique_syllable_structure"]:
-          if syllable_count_token not in groups:
-            return None
-          #get all the sets of rhyming lines that have at least enough rhymes to fit what we need for this syllable count.
-          candidate_lines = filter(lambda rhymes: len(rhymes) >= self.format["syllable_structure"].count(syllable_count_token), 
-                                    groups[syllable_count_token].values())
-          if not candidate_lines:
-            return None
- 
-          #TODO:
-          #for each set of lines in candidate lines, check if it has any partial lines
-          #and if so, whether, the following/preceding line(s) fit in the next slot.
-          #throw it out if not.
-          if random:
-            shuffle(candidate_lines)
- 
-          this_sylls_lines = list(candidate_lines[0])
-          for index, syllable_count in enumerate(self.format["syllable_structure"]):
-            if syllable_count == syllable_count_token and rhyme_element == self.format["rhyme_scheme"][index]:
-              for next_line in this_sylls_lines:
-                if poem[index] == None and next_line not in poem: #ensures there are no duplicate lines in poems.
-                  poem[index] = next_line
-                  break
-      return map(lambda line: line.text, poem)
-      """
-    # elif self.format["syllable_structure"]:
-    #   #TODO: delete all the hash entries that don't fit anything in the syllable structure
-    #   raise ShitsFuckedException # I think this is dead code
-    #   for index, syllable_count in enumerate(self.format["syllable_structure"]):
-    #     if syllable_count not in self.syllable_count_dict:
-    #       return None 
-    #     candidate_lines = filter(lambda l: l not in poem, self.syllable_count_dict[syllable_count])
-    #     if not candidate_lines:
-    #       return None
-    #     if random:
-    #       next_line_index = randint(0,len(candidate_lines) - 1)
-    #     else:
-    #       next_line_index = 0
-    #     next_line = candidate_lines[next_line_index]
-    #     poem[index] = next_line
-    #   return poem
-    # else:
-    #   #there's no rhyme scheme or syllable structure.
-    #   pass
 
 def _test():
   import doctest
