@@ -38,7 +38,7 @@ class Poemifier:
     self.rhyme_checker.debug = False
 
     self.allow_partial_lines = False
-    self.verbose = True
+    self.verbose = False
     self.where_to_put_partial_lines = {}
     self.asdf = {}
 
@@ -63,21 +63,13 @@ class Poemifier:
 
     #TODO: if self.allow_partial_lines, copy the shit from an older version in Git
     #      to keep the old way of doing things
-    if not self.allow_partial_lines:
-      for index, syllable_count_token in enumerate(self.format["syllable_structure"]):
-        rest_of_syllables = self.format["syllable_structure"][index:] #inclusive
-        temp_splits = line.split_line_to_format(rest_of_syllables)
-        if temp_splits != False:
-          self.asdf[line] = self.asdf.get(line, []) + [index]
-          splits += temp_splits
-      #print splits
-    else:
-      raise YourHandsUpInTheAirTonight
-      #TODO: this bit is left over, totally wrong.
-      #it needs to add correctly-split versions (at each token) for all parts of the sentence
-      #right now it just correctly splits the first N syllables of the sentences for each token
-      for syllable_count_token in self.format["unique_syllable_structure"]:
-        splits += line.split_line_at_syllable_count(syllable_count_token)
+    for index, syllable_count_token in enumerate(self.format["syllable_structure"]):
+      rest_of_syllables = self.format["syllable_structure"][index:] #inclusive
+      temp_splits = line.split_line_to_format(rest_of_syllables)
+      if temp_splits != False:
+        self.asdf[line] = self.asdf.get(line, []) + [index]
+        splits += temp_splits
+    #print splits
 
     for split in splits:
       if self.allow_partial_lines:
