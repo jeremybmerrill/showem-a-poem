@@ -1,5 +1,6 @@
 from rhymetime import RhymeChecker
 import re
+from random import randint
 
 class Line:
   #lines have text, a rime, and sometimes siblings (if the line comes from a split line-of-text)
@@ -138,6 +139,9 @@ class Line:
     elif isinstance(syllable_count, tuple):
       split_texts = map(lambda s: self._split_line_at_syllable_count_helper(self.clean_text(), s), \
                         range(syllable_count[0], syllable_count[1]+1))
+    elif syllable_count == "any":
+      split_texts = map(lambda s: self._split_line_at_syllable_count_helper(self.clean_text(), s), \
+                        [randint(5,20), randint(5,20), randint(5,20)] )
     splits_by_syllable_count = map(lambda texts: map(lambda text: Line(text, self.rhyme_checker), texts), filter(lambda x: x is not False, split_texts))
     for split_lines in splits_by_syllable_count:
       #print "a set of splits: " + str(split_lines)
