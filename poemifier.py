@@ -7,6 +7,9 @@ import re
 import sys
 import poem
 from line import Line
+import nltk.tokenize.punkt
+import nltk.data
+
 
 debug_lines = ["camping is in tents", "my tree table tries", "between those times I slept none"]
 
@@ -375,10 +378,17 @@ if __name__ == "__main__":
   poem = getattr(poem, sys.argv[1].capitalize())() #class
   input_text = sys.argv[2] or "./SCALIA.txt"
 
-  lists_of_linetexts = map(lambda x: x.split(";"), open(sys.argv[2]).read().split("\n"))
-  #lists_of_linetexts = map(lambda x: x.split(","), open(sys.argv[2]).read().split("\n"))
+  text = open(input_text).read()
+  print "unpickling"
+  sent_detector = nltk.data.load('tokenizers/punkt/english.pickle')
+  print "tokenizing"
+  linetexts = sent_detector.tokenize(text)
+  print "done tokenizing"
 
-  linetexts = [line for line_list in lists_of_linetexts for line in line_list]
+  # lists_of_linetexts = map(lambda x: x.split(";"), open(input_text).read().split("\n"))
+  # #lists_of_linetexts = map(lambda x: x.split(","), open(sys.argv[2]).read().split("\n"))
+
+  # linetexts = [line for line_list in lists_of_linetexts for line in line_list]
 
   #linetexts = ["camping is in tents", "my tree table tries", "between those times I slept none"]
   # linetexts = ["many words in english rhyme with song", "one two three four five six", "a bee see dee word kicks",
