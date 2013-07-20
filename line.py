@@ -51,7 +51,7 @@ class Line:
     if self._cleaned_text:
       return self._cleaned_text
     clean_text = re.sub("[^A-Za-z \-']", "", self.text)
-    clean_text = re.sub("  +", " ", clean_text)
+    #clean_text = re.sub("  +", " ", clean_text)
     clean_text = clean_text.strip()
     self._cleaned_text = clean_text
     return clean_text

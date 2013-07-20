@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-class Poem(object):
+class PoemFormat(object):
   syllable_structure = None
   rhyme_scheme = None
   lines_needed = 0
@@ -73,6 +73,9 @@ class Poem(object):
     self._filled_out_format = format
     return format
 
+  def format_poem(self, lines):
+    return "\n".join(["" if line == None else line.text for line in lines])
+
   def sing(self):
     #TODO: write this.
     class NotYetImplementedError(Exception):
@@ -81,19 +84,30 @@ class Poem(object):
 
 
 
-class Haiku(Poem):
+class Haiku(PoemFormat):
   syllable_structure = [5,7,5]
   rhyme_scheme = "abc"
 
-class Freeverse(Poem):
+class Freeverse(PoemFormat):
   def __init__(self, lines_needed=10):
     self.lines_needed = lines_needed
 
-class Limerick(Poem):
+class Limerick(PoemFormat):
   syllable_structure = [(9,11),(9, 11),6,6,(9, 11)]
   rhyme_scheme = "aabba"
 
-class Sonnet(Poem):
+class Sonnet(PoemFormat):
   syllable_structure = [10]
   rhyme_scheme = "ababcdcdefefgg"
 
+class Song(PoemFormat):
+  syllable_structure = [(5,10)]
+  rhyme_scheme = "aabbccddeeff" #"ababcdcdefefghghijij" #"aabbccddeeff"
+  def format_poem(self, lines):
+    chorus = lines[0:4]
+    verse1 = lines[4:8]
+    verse2 = lines[8:12]
+    verse3 = lines[12:16]
+    verse4 = lines[16:]
+    song = verse1 + [""] + chorus + [""] + verse2 + [""] + chorus + [""] + verse3 + [""] + chorus + [""] + verse4
+    return "\n  ".join(["" if line == None else line.text for line in lines])

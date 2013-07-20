@@ -1,15 +1,16 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from rhymetime import RhymeChecker
+from rhymetime import RhymeChecker, Pronunciation, Syllabification, Syllable
 from random import randint, shuffle, choice
 import re
 import sys
-import poem
+import poemformat
 from line import Line
 import nltk.tokenize.punkt
 import nltk.data
 
+import cPickle as pickle
 
 debug_lines = ["camping is in tents", "my tree table tries", "between those times I slept none"]
 
@@ -43,17 +44,34 @@ class Poemifier:
     self.allow_partial_lines = False
     self.verbose = False
     self.where_to_put_partial_lines = {}
-    self.asdf = {}
 
     #TODO abstract away hash types by format.
     self.rhyme_dict = {}
     self.syllable_count_dict = {}
     # self.global_only_once = 100
+    self.groups = None
 
   def try_line(self, line):
     """ Add a line, then return True if, given that line, a poem can be created."""
     self.add_line(line)
     return self.create_poem() #False or a poem.
+
+  def take_out_of_fridge(self, pickle_file):
+    jar = pickle.load( pickle_file )
+    self.where_to_put_partial_lines = jar['where_to_put_partial_lines']
+    self.rhyme_dict = jar['rhyme_dict']
+    self.syllable_count_dict = jar['syllable_count_dict']
+    self.groups = jar['groups']
+
+  def put_in_fridge(self, pickle_file):
+    if not self.groups:
+      raise Exception, "Only put a poemifier in the fridge if you've run prep_for_creation()"
+    jar = dict()
+    jar['where_to_put_partial_lines'] = self.where_to_put_partial_lines
+    jar['rhyme_dict'] = self.rhyme_dict
+    jar['syllable_count_dict'] = self.syllable_count_dict
+    jar['groups'] = self.groups
+    pickle.dump( jar, open(pickle_file, 'wb') ) 
 
   def add_line(self, line):
     """
@@ -64,13 +82,10 @@ class Poemifier:
     # for hashFunc, format_hash_dict in format_items:
     splits = []
 
-    #TODO: if self.allow_partial_lines, copy the shit from an older version in Git
-    #      to keep the old way of doing things
     for index, syllable_count_token in enumerate(self.format["syllable_structure"]):
       rest_of_syllables = self.format["syllable_structure"][index:] #inclusive
       temp_splits = line.split_line_to_format(rest_of_syllables)
       if temp_splits != False:
-        self.asdf[line] = self.asdf.get(line, []) + [index]
         splits += temp_splits
     #print splits
 
@@ -127,7 +142,9 @@ class Poemifier:
     last_word.strip(".,?!:;\" ")
     #does it fit where it is.
     rhyme_symbol = self.format["rhyme_scheme"][index]
-    lines_to_compare_to = [temp_poem[i] for i, symbol in enumerate(self.format["rhyme_scheme"]) if symbol == rhyme_symbol and temp_poem[i] and i != index]
+    lines_to_compare_to = [temp_poem[i] for i, symbol in \
+      enumerate(self.format["rhyme_scheme"]) if symbol == rhyme_symbol \
+      and temp_poem[i] and i != index]
     if not lines_to_compare_to:
       if self.debug:
         print "nothing to compare " + last_word + " to. " 
@@ -266,40 +283,50 @@ class Poemifier:
       for rime, rime_group in syllcount_group.items():
         shuffle(rime_group)
 
-  def create_poem(self, be_random=False):
-    """ Return False or a poem. """
-    #TODO: again, abstraction!
-    poem = [None] * self.format["lines_needed"]
-                        #old debug stuff: why is a haiku not being genreated?
-                        # flat_lines = [item.text for subl2 in [item for sublist in [d.values() for d in self.rhyme_dict.values()] for item in sublist] for item in subl2]
-                        # print [debug_line in flat_lines for debug_line in debug_lines]
-    groups = self._group_lines_by_rime()
-                        # seven = [item for sublist in groups[7].values() for item in sublist]
-                        # print "seven: " + str([debug_line in seven for debug_line in debug_lines])
-                        # print groups[7][(('AH', 'N'),)]
+  def prep_for_creation(self):
+    """Do a bunch of prep work for creating a poem. Doesn't commit us to anything yet."""
+    if self.groups:
+      return self.groups
 
-                        # flat_lines = [item.text for subl2 in [item for sublist in [d.values() for d in groups.values()] for item in sublist] for item in subl2]
+    self.groups = self._group_lines_by_rime()
+                        # seven = [item for sublist in self.groups[7].values() for item in sublist]
+                        # print "seven: " + str([debug_line in seven for debug_line in debug_lines])
+                        # print self.groups[7][(('AH', 'N'),)]
+
+                        # flat_lines = [item.text for subl2 in [item for sublist in [d.values() for d in self.groups.values()] for item in sublist] for item in subl2]
                         # print [debug_line in flat_lines for debug_line in debug_lines]
 
     if self.verbose:
       for syllable_count in list(self.format["unique_syllable_structure"]):
         if syllable_count == "any":
-          print "before pruning too small1, %(s)s: %(l)s" % {'s' : "total", 'l': str(len(groups))}
-        print "before pruning too small1, %(s)s: %(l)s" % {'s' : syllable_count, 'l': str(len(groups.get(syllable_count, "")))}
-    self._prune_too_small_grouped_lines(groups)
+          print "before pruning too small1, %(s)s: %(l)s" % {'s' : "total", 'l': str(len(self.groups))}
+        print "before pruning too small1, %(s)s: %(l)s" % {'s' : syllable_count, 'l': str(len(self.groups.get(syllable_count, "")))}
+    self._prune_too_small_grouped_lines(self.groups)
     if not self.allow_partial_lines:
       if self.verbose:
         for syllable_count in list(self.format["unique_syllable_structure"]):
-          print "before pruning desiblinged, %(s)s: %(l)s" % {'s' : syllable_count, 'l': str(len(groups.get(syllable_count, "")))}
-      self._prune_desiblinged_lines_from_groups(groups)
+          print "before pruning desiblinged, %(s)s: %(l)s" % {'s' : syllable_count, 'l': str(len(self.groups.get(syllable_count, "")))}
+      self._prune_desiblinged_lines_from_groups(self.groups)
       if self.verbose:
         for syllable_count in list(self.format["unique_syllable_structure"]):
-          print "before pruning too small2, %(s)s: %(l)s" % {'s' : syllable_count, 'l': str(len(groups.get(syllable_count, "")))}
-      self._prune_too_small_grouped_lines(groups)
+          print "before pruning too small2, %(s)s: %(l)s" % {'s' : syllable_count, 'l': str(len(self.groups.get(syllable_count, "")))}
+      self._prune_too_small_grouped_lines(self.groups)
       if self.verbose:
         for syllable_count in list(self.format["unique_syllable_structure"]):
-          print "after, %(s)s: %(l)s" % {'s' : syllable_count, 'l': str(len(groups.get(syllable_count, "")))}
+          print "after, %(s)s: %(l)s" % {'s' : syllable_count, 'l': str(len(self.groups.get(syllable_count, "")))}
           print ""
+    return self.groups
+
+
+  def create_poem(self, be_random=False):
+    """ Return False or a poem. """
+    #TODO: again, abstraction!
+    groups = self.prep_for_creation()
+
+    poem = [None] * self.format["lines_needed"]
+                        #old debug stuff: why is a haiku not being genreated?
+                        # flat_lines = [item.text for subl2 in [item for sublist in [d.values() for d in self.rhyme_dict.values()] for item in sublist] for item in subl2]
+                        # print [debug_line in flat_lines for debug_line in debug_lines]
 
     unique_rhyme_scheme = set(list(self.format["rhyme_scheme"]))
     for rhyme_element in unique_rhyme_scheme:
@@ -362,8 +389,10 @@ class Poemifier:
     #   print "generated " + str(len(poems)) + " semivalid poems"
     #   poems = self._cull_desiblinged_lines_from_poems(poems)
     #print "generated " + str(len(poems)) + " valid poems"
-
-    return poem
+    if None in poem:
+      return False
+    else:
+      return poem
 
 def _test():
   import doctest
@@ -373,9 +402,8 @@ class ShitsFuckedException(Exception):
   pass
 
 
-
-if __name__ == "__main__":
-  poem = getattr(poem, sys.argv[1].capitalize())() #class
+def poem_ex_nihilo():
+  poem = getattr(poemformat, sys.argv[1].capitalize())() #class
   input_text = sys.argv[2] or "./SCALIA.txt"
 
   text = open(input_text).read()
@@ -405,7 +433,12 @@ if __name__ == "__main__":
     #p.try_line(line) #too slow
     p.add_line(line)
   print ""
-  print p.create_poem(True)
+  print poem.format_poem( p.create_poem(True) )
+
+if __name__ == "__main__":
+  # import cProfile
+  # cProfile.run('poem_ex_nihilo()')
+  poem_ex_nihilo()
 
 #TODO: write tests (i.e. with randomness off)
 #TODO: reverse arguments to allow additional stuff to be specified on command line. or is this stupid, since I'm gonna put it on AWS?
