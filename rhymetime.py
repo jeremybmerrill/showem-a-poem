@@ -25,12 +25,12 @@ class RhymeChecker:
     self.syllabifications = {}
     self.syllable_count_guesser = SyllableCountGuesser()
     #self.consonants = [] #unimplemented
-    for line in open(os.path.abspath(os.path.join("./lib/cmudict/cmudict.0.7a.phones")) ,"r"):
+    for line in open(os.path.abspath(os.path.join(os.path.dirname(__file__), "./lib/cmudict/cmudict.0.7a.phones")) ,"r"):
       symbol, manner = line.strip().split("\t")
       if manner == "vowel":
         RhymeChecker.vowels.append(symbol)
       self.symbols[symbol] = manner
-    for index, line in enumerate(open(os.path.abspath(os.path.join("./lib/cmudict/cmudict.0.7a")), "r")):
+    for index, line in enumerate(open(os.path.abspath(os.path.join(os.path.dirname(__file__), "./lib/cmudict/cmudict.0.7a")), "r")):
       if line.strip()[0] in [";", "#"]:
         continue
       # if index % 1000 == 0 and index > 0:
@@ -38,14 +38,15 @@ class RhymeChecker:
       word_and_pronunciation = line.strip().split("  ")
       if len(word_and_pronunciation) > 1:
         word = word_and_pronunciation[0]
-        pronunciation = word_and_pronunciation[1]
+        pronunciation_str = word_and_pronunciation[1]
       else:
         print line
       if "(" in word:
         continue #not yet implemented
       #pronunciation = re.sub("[0-9]", "", pronunciation).split(" ") #ignore stress for now. for now. :P
-      pronunciation = pronunciation.split(" ")
-      self.pronunciations[word] = RhymeChecker.Pronunciation(pronunciation)
+      pronunciation_with_stress = pronunciation_str.split(" ")
+      pronunciation_without_stress = re.sub("[0-9]", "", pronunciation_str).split(" ")
+      self.pronunciations[word] = Pronunciation(pronunciation_with_stress, pronunciation_without_stress)
       #self.syllabifications[word] = self.syllabify_pron(pronunciation)
 
   def count_syllables(self, word):
@@ -100,15 +101,15 @@ class RhymeChecker:
     Returns a syllabification object.
 
     >>> r = RhymeChecker()
-    >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(RhymeChecker.Pronunciation(["SH", "UW1"])).syllables)
+    >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(Pronunciation(["SH", "UW1"])).syllables)
     [['SH', 'UW1']]
-    >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(RhymeChecker.Pronunciation(["L", "AY1", "N"])).syllables)
+    >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(Pronunciation(["L", "AY1", "N"])).syllables)
     [['L', 'AY1', 'N']]
-    >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(RhymeChecker.Pronunciation(['W', 'IH1', 'N'])).syllables)
+    >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(Pronunciation(['W', 'IH1', 'N'])).syllables)
     [['W', 'IH1', 'N']]
-    >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(RhymeChecker.Pronunciation(['T', 'W', 'IH1', 'N'])).syllables)
+    >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(Pronunciation(['T', 'W', 'IH1', 'N'])).syllables)
     [['T', 'W', 'IH1', 'N']]
-    >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(RhymeChecker.Pronunciation(['M', 'AY1', 'N', 'Z'])).syllables)
+    >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(Pronunciation(['M', 'AY1', 'N', 'Z'])).syllables)
     [['M', 'AY1', 'N', 'Z']]
     """
     #one consonant? prefer onset
@@ -154,7 +155,7 @@ class RhymeChecker:
     # print array_of_arrays_of_phonemes
     # print stresses_per_syllable
 
-    return RhymeChecker.Syllabification(map(lambda aops: RhymeChecker.Syllable(aops[0], aops[1]), zip(array_of_arrays_of_phonemes, stresses_per_syllable)))
+    return Syllabification(map(lambda aops: Syllable(aops[0], aops[1]), zip(array_of_arrays_of_phonemes, stresses_per_syllable)))
 
   def rhymes_with(self, word1, word2):
     """ Returns whether word1 rhymes with word2.
@@ -188,68 +189,69 @@ class RhymeChecker:
     #sys.stderr.write( str(min_length) + " " + str(self.get_rime(word1)[-min_length:]) + " " + str(self.get_rime(word2)[-min_length:]) + "\n")
     return self.get_rime(word1)[-min_length:] == self.get_rime(word2)[-min_length:]
 
-  class Pronunciation:
-    def __init__(self, phonemes_array):
-      self.phonemes_with_stress = phonemes_array
-      self.phonemes = map(lambda ph : re.sub("[0-9]", "", ph), phonemes_array)
 
-  class Syllabification:
-    def __init__(self, array_of_syllables):
-      self.syllables = array_of_syllables
-    def primary_stress(self):
-      mappedy_map = map(lambda s: s.stress == 1, self.syllables)
-      if True in mappedy_map:
-        return mappedy_map.index(True)
-      else:
-        return max(0, len(mappedy_map) - 2) #assume peunultimate stress.
-    def secondary_stress(self):
-      return map(lambda s: s.stress == 2, self.syllables).index(True)
-    def stressed(self, index):
-      return self.syllables[index].stress > 0
+class Pronunciation:
+  def __init__(self, phonemes_with_stress_array, phonemes_without_stress_array):
+    self.phonemes_with_stress = phonemes_with_stress_array
+    self.phonemes = phonemes_without_stress_array
 
-  class Syllable:
-    def __init__(self, phoneme_array, stress=0):
-      self.phonemes = phoneme_array
-      self._nucleus_end_location = None #set later, if needed
-      self._nucleus_start_location = None #set later, if needed
-      self.stress = stress
+class Syllabification:
+  def __init__(self, array_of_syllables):
+    self.syllables = array_of_syllables
+  def primary_stress(self):
+    mappedy_map = map(lambda s: s.stress == 1, self.syllables)
+    if True in mappedy_map:
+      return mappedy_map.index(True)
+    else:
+      return max(0, len(mappedy_map) - 2) #assume peunultimate stress.
+  def secondary_stress(self):
+    return map(lambda s: s.stress == 2, self.syllables).index(True)
+  def stressed(self, index):
+    return self.syllables[index].stress > 0
 
-    #assumes rhyme involves only rime of last syllable; this is incomplete.
-    #for paroxytones (ha! words with penultimate stress, let's include the onset
-    # of the last syllable and rime of the penultimate)
+class Syllable:
+  def __init__(self, phoneme_array, stress=0):
+    self.phonemes = phoneme_array
+    self._nucleus_end_location = None #set later, if needed
+    self._nucleus_start_location = None #set later, if needed
+    self.stress = stress
 
-    def phonemes_with_stress(self):
-      if self.stress:
-        stress_str = str(self.stress)
-      else:
-        stress_str = ""
-      return self.onset() + map(lambda s: s + stress_str, self.nucleus()) + self.coda()
+  #assumes rhyme involves only rime of last syllable; this is incomplete.
+  #for paroxytones (ha! words with penultimate stress, let's include the onset
+  # of the last syllable and rime of the penultimate)
 
-    def nucleus(self):
-      return filter(lambda x: x in RhymeChecker.vowels, self.phonemes)
-    def _nucleus_start(self):
-      if not self._nucleus_start_location:
-        self._nucleus_start_location = map(lambda x: x in RhymeChecker.vowels, self.phonemes).index(True)
-      return self._nucleus_start_location
-    def _nucleus_end(self):
-      if not self._nucleus_end_location:
-        reversable_phonemes = list(self.phonemes)
-        reversable_phonemes.reverse()
-        self._nucleus_end_location = len(reversable_phonemes) - map(lambda x: x in RhymeChecker.vowels, reversable_phonemes).index(True) 
-      return self._nucleus_end_location
-    def coda(self):
-      return self.phonemes[self._nucleus_end():]
-    def rime(self):
-      return self.nucleus() + self.coda()
-    def onset(self):
-      return self.phonemes[:self._nucleus_start()]
-    def stressed(self):
-      return self.stress > 0
+  def phonemes_with_stress(self):
+    if self.stress:
+      stress_str = str(self.stress)
+    else:
+      stress_str = ""
+    return self.onset() + map(lambda s: s + stress_str, self.nucleus()) + self.coda()
 
-  def test_stuff(self, word):
-    pron = self.pronunciations[word.upper()]
-    print map(lambda s: s, pron.phonemes)
-    print map(lambda s: s.phonemes_with_stress(), self.syllabify_pron(pron).syllables)
+  def nucleus(self):
+    return filter(lambda x: x in RhymeChecker.vowels, self.phonemes)
+  def _nucleus_start(self):
+    if not self._nucleus_start_location:
+      self._nucleus_start_location = map(lambda x: x in RhymeChecker.vowels, self.phonemes).index(True)
+    return self._nucleus_start_location
+  def _nucleus_end(self):
+    if not self._nucleus_end_location:
+      reversable_phonemes = list(self.phonemes)
+      reversable_phonemes.reverse()
+      self._nucleus_end_location = len(reversable_phonemes) - map(lambda x: x in RhymeChecker.vowels, reversable_phonemes).index(True) 
+    return self._nucleus_end_location
+  def coda(self):
+    return self.phonemes[self._nucleus_end():]
+  def rime(self):
+    return self.nucleus() + self.coda()
+  def onset(self):
+    return self.phonemes[:self._nucleus_start()]
+  def stressed(self):
+    return self.stress > 0
+
+def test_stuff(self, word):
+  pron = self.pronunciations[word.upper()]
+  print map(lambda s: s, pron.phonemes)
+  print map(lambda s: s.phonemes_with_stress(), self.syllabify_pron(pron).syllables)
 
 def _test():
   import doctest
