@@ -29,7 +29,7 @@ Architecture:
 #TODO: make a Heroku/Flask-based app for people to make their own poems.
 
 class Poemifier:
-  def __init__(self, poem):
+  def __init__(self, poem, **kwargs):
     """Specify the name of a known format or specify a fully-defined format."""
     self.debug = False
     #self.poem_complete = False #dunno what this is.
@@ -38,7 +38,10 @@ class Poemifier:
     self.format = poem.get_format()
     self.lines_needed = self.format["lines_needed"]
 
-    self.rhyme_checker = RhymeChecker()
+    if 'rhyme_checker' in kwargs:
+      self.rhyme_checker = kwargs['rhyme_checker']
+    else:
+      self.rhyme_checker = RhymeChecker()
     self.rhyme_checker.debug = False
 
     self.allow_partial_lines = False
@@ -175,9 +178,10 @@ class Poemifier:
         already_used_last_words = set()
         new_rhyme_group = []
         for rhyme_line in rhyme_group:
-          if rhyme_line.clean_text().split(" ")[-1].lower() not in already_used_last_words or \
+          last_word = rhyme_line.clean_text().split(" ")[-1].lower()
+          if last_word not in already_used_last_words or \
             self.format["syllable_structure"].count(syllable_count_token) == 1:
-            already_used_last_words.add(rhyme_line.clean_text().split(" ")[-1].lower())
+            already_used_last_words.add(last_word)
             new_rhyme_group.append(rhyme_line)
 
         inner_groups_by_syll_count[syllable_count_token] = new_rhyme_group
@@ -402,16 +406,20 @@ class ShitsFuckedException(Exception):
   pass
 
 
-def poem_ex_nihilo():
-  poem = getattr(poemformat, sys.argv[1].capitalize())() #class
-  input_text = sys.argv[2] or "./SCALIA.txt"
+def poem_ex_nihilo(**kwargs):
+  if 'format' in kwargs:
+    poem = getattr(poemformat, kwargs['format'].capitalize())() #class
+  else:
+    poem = getattr(poemformat, sys.argv[1].capitalize())() #class
+
+  if 'input_text' in kwargs:
+    input_text = './SCALIA.txt'
+  else:
+    input_text = sys.argv[2] or "./SCALIA.txt"
 
   text = open(input_text).read()
-  print "unpickling"
   sent_detector = nltk.data.load('tokenizers/punkt/english.pickle')
-  print "tokenizing"
   linetexts = sent_detector.tokenize(text)
-  print "done tokenizing"
 
   # lists_of_linetexts = map(lambda x: x.split(";"), open(input_text).read().split("\n"))
   # #lists_of_linetexts = map(lambda x: x.split(","), open(sys.argv[2]).read().split("\n"))
@@ -422,8 +430,10 @@ def poem_ex_nihilo():
   # linetexts = ["many words in english rhyme with song", "one two three four five six", "a bee see dee word kicks",
   #  "This is a line that is twenty long", "here are ten more ending in wrong", "Jeremy Bee Merrill plays ping pong",
   #  ]
-
-  p = Poemifier(poem)
+  if 'rhyme_checker' in kwargs:
+    p = Poemifier(poem, rhyme_checker=kwargs['rhyme_checker'])
+  else:
+    p = Poemifier(poem)
   p.debug = True
   #this can't be a do... while, because we have to add all the lines, then do various processing steps.
   for linetext in linetexts:
@@ -433,12 +443,28 @@ def poem_ex_nihilo():
     #p.try_line(line) #too slow
     p.add_line(line)
   print ""
-  print poem.format_poem( p.create_poem(True) )
+  print poem.format_poem( p.create_poem(False) ) #random?
+
+def profile():
+  #N.B. these don't, work, jus tcopy/paste them into the if name = main block
+  import cProfile
+  import pstats
+  cProfile.run("poem_ex_nihilo(format='haiku', input_text=None)", 'binaryprofile.prof', 'tottime')
+  pstats.Stats('binaryprofile.prof').sort_stats('tottime').print_stats(.1)
+
+def profile_without_initializing_rhymechecker():
+  #N.B. these don't, work, jus tcopy/paste them into the if name = main block
+  import cProfile
+  import pstats
+  r = RhymeChecker()
+  cProfile.run("poem_ex_nihilo(rhyme_checker=r, format='haiku', input_text=None)", 'binaryprofile.prof', 'tottime')
+  pstats.Stats('binaryprofile.prof').sort_stats('tottime').print_stats(.1)
 
 if __name__ == "__main__":
-  # import cProfile
-  # cProfile.run('poem_ex_nihilo()')
-  poem_ex_nihilo()
+  import cProfile
+  import pstats
+  cProfile.run("poem_ex_nihilo(format='haiku', input_text=None)", 'binaryprofile.prof', 'tottime')
+  pstats.Stats('binaryprofile.prof').sort_stats('tottime').print_stats(.1)
 
 #TODO: write tests (i.e. with randomness off)
 #TODO: reverse arguments to allow additional stuff to be specified on command line. or is this stupid, since I'm gonna put it on AWS?

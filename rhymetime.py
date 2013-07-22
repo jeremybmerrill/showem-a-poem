@@ -18,43 +18,61 @@ from syllable_count_guesser import SyllableCountGuesser
 """
 
 class RhymeChecker:
+  zero_thru_ten = map(lambda i: str(i), xrange(0,10))
+  
   def __init__(self, syllabizer=None):
     RhymeChecker.vowels = []
+    self.stashed = {}
     self.symbols = {}
     self.pronunciations = {}
     self.syllabifications = {}
+    self.asdf = 0
     self.syllable_count_guesser = SyllableCountGuesser()
     #self.consonants = [] #unimplemented
-    for line in open(os.path.abspath(os.path.join(os.path.dirname(__file__), "./lib/cmudict/cmudict.0.7a.phones")) ,"r"):
-      symbol, manner = line.strip().split("\t")
-      if manner == "vowel":
-        RhymeChecker.vowels.append(symbol)
-      self.symbols[symbol] = manner
-    for index, line in enumerate(open(os.path.abspath(os.path.join(os.path.dirname(__file__), "./lib/cmudict/cmudict.0.7a")), "r")):
-      if line.strip()[0] in [";", "#"]:
-        continue
-      # if index % 1000 == 0 and index > 0:
-      #   print("indexed " + str(index) + " words.")
-      word_and_pronunciation = line.strip().split("  ")
-      if len(word_and_pronunciation) > 1:
-        word = word_and_pronunciation[0]
-        pronunciation_str = word_and_pronunciation[1]
-      else:
-        print line
-      if "(" in word:
-        continue #not yet implemented
-      #pronunciation = re.sub("[0-9]", "", pronunciation).split(" ") #ignore stress for now. for now. :P
-      pronunciation_with_stress = pronunciation_str.split(" ")
-      pronunciation_without_stress = re.sub("[0-9]", "", pronunciation_str).split(" ")
-      self.pronunciations[word] = Pronunciation(pronunciation_with_stress, pronunciation_without_stress)
-      #self.syllabifications[word] = self.syllabify_pron(pronunciation)
+    with open(os.path.abspath(os.path.join(os.path.dirname(__file__), "./lib/cmudict/cmudict.0.7a.phones")) ,"r") as phones_file:
+      for line in phones_file:
+        symbol, manner = line.strip().split("\t")
+        if manner == "vowel":
+          RhymeChecker.vowels.append(symbol)
+        self.symbols[symbol] = manner
+    #N.B.: unpickling cmudict instead of regen'ing it from file doesn't speed things up.
+    with open(os.path.abspath(os.path.join(os.path.dirname(__file__), "./lib/cmudict/cmudict.0.7a")), "r") as cmudict_file:
+      for line in cmudict_file:
+        stripped_line = line.strip()
+        if stripped_line[0] in [";", "#"]:
+          continue
+        word_and_pronunciation = stripped_line.split("  ")
+        if len(word_and_pronunciation) > 1:
+          word = word_and_pronunciation[0]
+          pronunciation_str = word_and_pronunciation[1]
+        else:
+          print line
+        if "(" in word:
+          continue #not yet implemented
+        #pronunciation = re.sub("[0-9]", "", pronunciation).split(" ") #ignore stress for now. for now. :P
+        pronunciation_with_stress = pronunciation_str.split(" ")
+        #pronunciation_without_stress = RhymeChecker.numbers_re.sub("", pronunciation_str).split(" ")
+        pronunciation_without_stress = pronunciation_str.translate(None, "0123456789").split(" ")
+        self.pronunciations[word] = Pronunciation(pronunciation_with_stress, pronunciation_without_stress)
+        #self.syllabifications[word.lower()] = self.syllabify_pron(self.pronunciations[word])
+        #this costs an extra 4.8 seconds, but shaves 0.1 seconds off each poem created afterwards.
+        #worth it if there can be just one global RhymeChecker
 
   def count_syllables(self, word):
     """ Return the number of syllables in word. """
-    if word.upper() in self.syllabifications:
-      return len(self.syllabifications[word.upper()].syllables)
+    word_lower = word.lower()
+    word_upper = word.upper()
+    if word_lower in self.stashed:
+      self.stashed[word_lower]
+
+    if word_upper in self.pronunciations:
+      count = len(self.syllabify_pron(self.pronunciations[word_upper], word_upper).syllables)
+    # elif "-" in word:
+    #   count = sum(map(self.count_syllables, word.split("-")))
     else:
-      return self.syllable_count_guesser.count_syllables(word.lower())
+      count = self.syllable_count_guesser.count_syllables(word_lower)
+    self.stashed[word_lower] = count
+    return count
 
   def syllabify(self, word):
     """ Divide a word directly into its constituent syllables. 
@@ -63,7 +81,8 @@ class RhymeChecker:
     >>> map(lambda syll: syll.phonemes, r.syllabify("shoe").syllables)
     [['SH', 'UW']]
     """
-    return self.syllabify_pron(self.pronunciations[word.upper()])
+    word_upper = word.upper()
+    return self.syllabify_pron(self.pronunciations[word_upper], word_upper)
 
   def get_rime(self, word):
     """
@@ -94,7 +113,7 @@ class RhymeChecker:
     except KeyError:
       return []
 
-  def syllabify_pron(self, pronunciation):
+  def syllabify_pron(self, pronunciation, word=None):
     """
     Divide a word's Pronunciation into syllables.
 
@@ -112,6 +131,9 @@ class RhymeChecker:
     >>> map(lambda syll: syll.phonemes_with_stress(), r.syllabify_pron(Pronunciation(['M', 'AY1', 'N', 'Z'])).syllables)
     [['M', 'AY1', 'N', 'Z']]
     """
+    if word and (word in self.syllabifications):
+      return self.syllabifications[word]
+
     #one consonant? prefer onset
     #three consonants? prefer one coda, two onsets
     array_of_arrays_of_phonemes = []
@@ -120,7 +142,7 @@ class RhymeChecker:
       #if it's a vowel, start a new syllable and take all but one of the trailing consonants in the prev syll.
       #print phoneme
       stress = None
-      if phoneme[-1] in map(lambda i: str(i), range(0,10)):
+      if phoneme[-1] in RhymeChecker.zero_thru_ten:
         stress = int(phoneme[-1])
         phoneme = phoneme[:-1]
       if not array_of_arrays_of_phonemes:
@@ -131,11 +153,11 @@ class RhymeChecker:
           previous_syllable = array_of_arrays_of_phonemes[-1]
           vowels_in_syllable = map(lambda x: x in RhymeChecker.vowels, previous_syllable)
           if True in vowels_in_syllable:
-            onset_location = map(lambda x: x in RhymeChecker.vowels, previous_syllable).index(True)
+            onset_location = vowels_in_syllable.index(True)
             consonants_to_pop = len(array_of_arrays_of_phonemes[-1][onset_location:])/2
             onset = []
             if consonants_to_pop > 0:
-              for index in range(consonants_to_pop):
+              for index in xrange(consonants_to_pop):
                 onset.append(array_of_arrays_of_phonemes[-1].pop())
             else:
               array_of_arrays_of_phonemes.append([])
@@ -155,7 +177,11 @@ class RhymeChecker:
     # print array_of_arrays_of_phonemes
     # print stresses_per_syllable
 
-    return Syllabification(map(lambda aops: Syllable(aops[0], aops[1]), zip(array_of_arrays_of_phonemes, stresses_per_syllable)))
+    #N.B.: `zip` time is unavoidable
+    syllabification = Syllabification([Syllable(aops[0], aops[1]) for aops in zip(array_of_arrays_of_phonemes, stresses_per_syllable)])
+    if word:
+      self.syllabifications[word] = syllabification
+    return syllabification
 
   def rhymes_with(self, word1, word2):
     """ Returns whether word1 rhymes with word2.

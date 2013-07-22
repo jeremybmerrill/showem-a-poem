@@ -3,8 +3,8 @@
 
 class SyllableCountGuesser:
   def __init__(self):
-    self.vowels = ["a", "e", "i", "o", "u"] # Y is dealt with separately
-    self.consonants = ["b", "c", "d", "f", "g" "h", "j", "k", 'l', 'm', 'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'y', 'z']
+    self.vowels = set(["a", "e", "i", "o", "u"]) # Y is dealt with separately
+    self.consonants = set(["b", "c", "d", "f", "g" "h", "j", "k", 'l', 'm', 'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'y', 'z'])
     self.exceptions = {
       "sometimes" : 2,
       "ritual" : 3,
@@ -113,12 +113,11 @@ class SyllableCountGuesser:
 
     word = word.lower()
 
-    letters = list(word)
     previous_letter = None
     syllables = 0
-    for index, letter in enumerate(letters):
+    for index, letter in enumerate(word):
       if previous_letter not in self.vowels and letter in self.vowels:
-        if not ((len(letters)-1) == index and letter == "e"):
+        if not ((len(word)-1) == index and letter == "e"):
           syllables += 1
 
       #Exceptions, because English says fuck you.

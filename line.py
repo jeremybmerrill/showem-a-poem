@@ -3,10 +3,21 @@ import re
 from random import randint
 
 class Line:
+
+  abbrevs_re = re.compile("\s[BCDEFGHJKLMNOPQRSTUVWXYZ]\s")
+  non_alpha_space_or_hyphen_re = re.compile("[^A-Za-z \-']")
+  vowels_re = re.compile("aeiouy")
+
   #lines have text, a rime, and sometimes siblings (if the line comes from a split line-of-text)
-  def __init__(self, text, rhyme_checker=RhymeChecker()):
+  def __init__(self, text, rhyme_checker=None):
     self.text = text
-    self.rhyme_checker = rhyme_checker
+
+    #cf. http://stackoverflow.com/questions/1132941/least-astonishment-in-python-the-mutable-default-argument
+    if rhyme_checker:
+      self.rhyme_checker = rhyme_checker
+    else:
+      self.rhyme_checker = RhymeChecker()
+
     self.siblings = [[], []]
     self._cleaned_text = None
   def __repr__(self):
@@ -40,18 +51,22 @@ class Line:
 
   def should_be_skipped(self):
     number_abbrev = "No." in self.text
-    other_abbrev = re.search("\s[BCDEFGHJKLMNOPQRSTUVWXYZ]\s", self.clean_text())
+    other_abbrev = Line.abbrevs_re.search(self.clean_text())
     case_citations = " v." in self.text
     blank = self.clean_text().strip() == ""
-    nonwords = False in [re.search("aeiouy", word) for word in self.clean_text().split(" ")]
+    nonwords = False in [Line.vowels_re.search(word) for word in self.clean_text().split(" ")]
     numbers = re.search("[0-9]", self.text)
     return number_abbrev or other_abbrev or case_citations or blank or nonwords or numbers
 
   def clean_text(self):
     if self._cleaned_text:
       return self._cleaned_text
-    clean_text = re.sub("[^A-Za-z \-']", "", self.text)
+    #clean_text = re.sub("[^A-Za-z \-']", "", self.text)
+    clean_text = Line.non_alpha_space_or_hyphen_re.sub("", self.text)
     #clean_text = re.sub("  +", " ", clean_text)
+    clean_text = ' '.join(clean_text.split())
+     
+
     clean_text = clean_text.strip()
     self._cleaned_text = clean_text
     return clean_text
