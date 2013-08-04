@@ -74,7 +74,7 @@ class PoemFormat(object):
     return format
 
   def format_poem(self, lines):
-    return "\n".join(["" if line == None else line.text for line in lines])
+    return "\n".join([("" if (line is None) else line.text) for line in lines])
 
   def sing(self):
     #TODO: write this.

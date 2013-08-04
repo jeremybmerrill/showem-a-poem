@@ -4,7 +4,7 @@ from random import randint
 
 class Line:
 
-  abbrevs_re = re.compile("\s[BCDEFGHJKLMNOPQRSTUVWXYZ]\s")
+  single_letters_re = re.compile("\s[BCDEFGHJKLMNOPQRSTUVWXYZ]\s")
   non_alpha_space_or_hyphen_re = re.compile("[^A-Za-z \-']")
   vowels_re = re.compile("aeiouy")
 
@@ -51,7 +51,7 @@ class Line:
 
   def should_be_skipped(self):
     number_abbrev = "No." in self.text
-    other_abbrev = Line.abbrevs_re.search(self.clean_text())
+    other_abbrev = Line.single_letters_re.search(self.clean_text())
     case_citations = " v." in self.text
     blank = self.clean_text().strip() == ""
     nonwords = False in [Line.vowels_re.search(word) for word in self.clean_text().split(" ")]
